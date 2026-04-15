@@ -55,7 +55,6 @@ router.post('/', async (req, res) => {
         category,
         price,
         available: stock > 0,
-        isAlcohol: category === 'Spirits' || category === 'Beer' || category === 'Wine'
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
@@ -84,7 +83,6 @@ router.put('/:id', async (req, res) => {
         category: updated.category,
         price: updated.price,
         available: updated.stock > 0,
-        isAlcohol: updated.category === 'Spirits' || updated.category === 'Beer' || updated.category === 'Wine'
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );

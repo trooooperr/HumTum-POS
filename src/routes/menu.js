@@ -31,7 +31,6 @@ router.post('/sync', async (req, res) => {
           category: inv.category,
           price: inv.sellingPrice || inv.costPrice,
           available: inv.stock > 0,
-          isAlcohol: inv.category === 'Spirits' || inv.category === 'Beer' || inv.category === 'Wine'
         },
         { upsert: true, new: true, setDefaultsOnInsert: true }
       );
