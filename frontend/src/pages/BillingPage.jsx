@@ -276,8 +276,8 @@ export default function BillingPage() {
         </div>
       </div>
 
-      {/* DIAGNOSTIC FOOTER */}
-      <div style={{
+      {/* DIAGNOSTIC FOOTER (Desktop/Tablet Only) */}
+      <div className="debug-footer-res" style={{
         position: 'fixed', bottom: 10, left: 10, background: 'rgba(239, 158, 11, 0.9)', 
         color: '#000', padding: '8px 15px', borderRadius: 10, fontSize: 12, zIndex: 9999,
         fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.3)', pointerEvents: 'none'
@@ -288,6 +288,9 @@ export default function BillingPage() {
       {payModal && <PayModal total={grandTotal} currency={c} onClose={()=>setPayModal(false)} onConfirm={doGen}/>}
 
       <style>{`
+        @media (max-width: 1023px) {
+          .debug-footer-res { display: none !important; }
+        }
       #root, .fi {
   margin: 0;
   padding: 0;
