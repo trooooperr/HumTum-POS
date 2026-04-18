@@ -40,17 +40,24 @@ function scheduleDailyReport() {
 async function warmupCache() {
   try {
     const MenuItem = require('./src/models/MenuItem');
-    const [menuItems, settings] = await Promise.all([
+    const Inventory = require('./src/models/Inventory');
+    const Worker = require('./src/models/Worker');
+    
+    const [menuItems, settings, inventory, workers] = await Promise.all([
       MenuItem.find().sort({ category: 1, name: 1 }),
       (async () => {
         const existing = await Settings.findOne();
         return existing || Settings.create({});
       })(),
+      Inventory.find().sort({ category: 1, name: 1 }),
+      Worker.find().sort({ name: 1 })
     ]);
 
     await Promise.all([
       setCache('menu:all', menuItems, 300),
       setCache('settings:current', settings, 300),
+      setCache('inventory:all', inventory, 300),
+      setCache('workers:all', workers, 300)
     ]);
     console.log('🔥 Cache warmed up');
   } catch (err) {
