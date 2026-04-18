@@ -60,8 +60,8 @@ async function isRedisHealthy() {
 async function getCache(key) {
   try {
     if (!client) return null;
-
-    const val = await client.get(key);
+    const prefix = process.env.REDIS_PREFIX || '';
+    const val = await client.get(prefix + key);
     if (val === null || val === undefined) return null;
 
     // Upstash returns already-parsed objects when data was stored as JSON string.
@@ -82,8 +82,8 @@ async function getCache(key) {
 async function setCache(key, value, ttl = 300) {
   try {
     if (!client) return;
-
-    await client.set(key, JSON.stringify(value), {
+    const prefix = process.env.REDIS_PREFIX || '';
+    await client.set(prefix + key, JSON.stringify(value), {
       ex: ttl,
     });
   } catch (e) {}
@@ -97,7 +97,8 @@ async function deleteCache(keys) {
     if (!client) return;
 
     const keyArray = Array.isArray(keys) ? keys : [keys];
-    await Promise.all(keyArray.map(k => client.del(k)));
+    const prefix = process.env.REDIS_PREFIX || '';
+    await Promise.all(keyArray.map(k => client.del(prefix + k)));
   } catch (e) {}
 }
 
