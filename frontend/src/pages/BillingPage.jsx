@@ -141,7 +141,7 @@ function PayModal({ total, currency, onClose, onConfirm }) {
 }
 
 export default function BillingPage() {
-  const { tableBills, activeTableId, selectTable, updateTableItem, clearTable, setTableField, billTotals, filteredMenu, categories, categoryFilter, setCategoryFilter, menuSearch, setMenuSearch, menuItems, inventory, getTableStatus, generateBill, settings, NUM_TABLES } = useApp();
+  const { tableBills, activeTableId, selectTable, updateTableItem, clearTable, setTableField, billTotals, allSellableItems, filteredMenu, categories, categoryFilter, setCategoryFilter, menuSearch, setMenuSearch, menuItems, inventory, getTableStatus, generateBill, settings, NUM_TABLES } = useApp();
   const [pm, setPm] = useState('cash');
   const [payModal, setPayModal] = useState(false);
   const [busy, setBusy] = useState(false);
