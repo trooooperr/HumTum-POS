@@ -434,19 +434,6 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* DATA SYNC SECTION */}
-        <div className="card card-p settings-full" style={{ border: '1px solid var(--b2)' }}>
-          <div className="sdiv" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Database size={16} /> Data Synchronization
-          </div>
-          <p style={{ fontSize: 13, color: 'var(--t2)', marginBottom: 15 }}>
-            If you have manually added or edited items directly in the Cloud Database (MongoDB), 
-            use this button to clear the application cache and synchronize the live website.
-          </p>
-          <button className="btn btn-primary" onClick={handleSyncData} style={{ height: 44, width: '100%', maxWidth: 200 }}>
-            Sync Cloud Data
-          </button>
-        </div>
 
         {/* PROFILE SECTION */}
         <div className="card card-p settings-full" style={{ border: '1px solid var(--b2)' }}>
