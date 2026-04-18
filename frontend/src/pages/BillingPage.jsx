@@ -205,7 +205,7 @@ export default function BillingPage() {
             {filteredMenu.map(item=>{
               const stockItem = inventory?.find(inv => inv.name.toLowerCase().trim() === item.name.toLowerCase().trim());
               return (
-                <MenuItem key={item._id} item={item} qty={table.items.find(i=>i._id===item._id)?.quantity||0}
+                <MenuItem key={item._id} item={item} qty={table.items.find(i=>String(i._id)===String(item._id))?.quantity||0}
                   stock={stockItem?.stock}
                   minStock={stockItem?.minStock}
                   add={(id,a)=>updateTableItem(activeTableId,id,a,allSellableItems)}

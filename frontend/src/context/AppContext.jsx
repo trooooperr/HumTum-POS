@@ -309,10 +309,12 @@ export function AppProvider({ children }) {
   const selectTable = useCallback((id) => setActiveTableId(id), []);
 
   const updateTableItem = useCallback(async (tableId, itemId, action, itemsArray) => {
-    if (!tableId) return;
+    if (!tableId) {
+      console.warn('updateTableItem: No tableId provided.');
+      return;
+    }
 
     setTableBills(prev => {
-      // Ensure the table structure exists
       const currentTable = prev[tableId] || { 
         items: [], 
         discount: '', 
@@ -323,8 +325,8 @@ export function AppProvider({ children }) {
       };
 
       const table = { ...currentTable, items: [...currentTable.items] };
-      const idx   = table.items.findIndex(i => i._id === itemId);
-      const item  = (Array.isArray(itemsArray) ? itemsArray : []).find(i => i._id === itemId);
+      const idx   = table.items.findIndex(i => String(i._id) === String(itemId));
+      const item  = (Array.isArray(itemsArray) ? itemsArray : []).find(i => String(i._id) === String(itemId));
 
       if (action === 'increase') {
         if (idx >= 0) {
