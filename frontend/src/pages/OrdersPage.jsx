@@ -77,7 +77,7 @@ function SettleModal({ order, currency, onClose, onSettle }) {
             <span style={{ fontSize: 16, marginRight: 2, opacity: 0.7 }}>{currency}</span>
             {order.dueAmount.toLocaleString()}
           </div>
-          <div style={{ fontSize: 9, color: 'var(--t3)', marginTop: 4, letterSpacing: 0.5, fontWeight: 700 }}>HTB-{order.billNo}</div>
+          <div style={{ fontSize: 9, color: 'var(--t3)', marginTop: 4, letterSpacing: 0.5, fontWeight: 700 }}>{order.billNo?.startsWith('HTB-') ? order.billNo : 'HTB-'+order.billNo}</div>
         </div>
 
         {/* Form Body */}
@@ -251,7 +251,7 @@ export default function OrdersPage() {
             <div key={o._id} className="order-mobile-card" onClick={() => setInvoiceOrder(o)}>
               <div className="order-card-row">
                 <div>
-                  <div className="bill-no-tag">HTB-{o.billNo}</div>
+                  <div className="bill-no-tag">{o.billNo?.startsWith('HTB-') ? o.billNo : 'HTB-'+o.billNo}</div>
                   <div className="card-meta">{new Date(o.date).toLocaleDateString()} · Table {o.tableNo}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
@@ -288,7 +288,7 @@ export default function OrdersPage() {
               {filtered.map(o => (
                 <tr key={o._id}>
                   <td className="td-date">{new Date(o.date).toLocaleDateString()}</td>
-                  <td style={{ fontWeight: 700 }}>HTB-{o.billNo}</td>
+                  <td style={{ fontWeight: 700 }}>{o.billNo?.startsWith('HTB-') ? o.billNo : 'HTB-'+o.billNo}</td>
                   <td style={{ textAlign: 'center' }}>T{o.tableNo}</td>
                   <td className="td-date">{o.customerName || '—'}</td>
                   <td style={{ textAlign: 'right', fontWeight: 800, color: 'var(--amber)' }}>{c}{o.grandTotal.toFixed(2)}</td>

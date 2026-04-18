@@ -24,7 +24,7 @@ function MenuItem({ item, qty, add, rem, stock }) {
         <img className="mimg-big" src={src} alt={item.name} onError={e=>{e.target.src=`https://placehold.co/320x320/171921/F59E0B?text=${encodeURIComponent(item.name.slice(0,1))}`}}/>
         <div className="m-price-tag" style={{ position:'absolute', bottom:8, left:8, zIndex:5 }}>₹{item.price.toFixed(0)}</div>
         {!item.available && <div className="sold-out-badge-top" style={{ top: 8, left: 8, right: 'auto' }}>SOLD OUT</div>}
-        {stock !== undefined && (
+        {stock !== undefined && stock > 0 && (
           <div className={`stock-badge ${stock <= 5 ? 'low' : ''}`} style={{ top: 8, right: 8 }}>
             Stock: {stock}
           </div>

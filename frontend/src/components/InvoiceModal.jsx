@@ -73,7 +73,7 @@ const handlePrint = () => {
 
           <div class="dash-line"></div>
 
-          <div class="row"><span>BILL: HTB-${o.billNo}</span><span>TABLE: ${o.tableNo}</span></div>
+          <div class="row"><span>BILL: ${o.billNo?.startsWith('HTB-') ? o.billNo : 'HTB-'+o.billNo}</span><span>TABLE: ${o.tableNo}</span></div>
           <div class="row" style="font-size: 10px;">DATE: ${new Date(o.date).toLocaleString('en-IN')}</div>
 
           <div class="dash-line"></div>
@@ -137,7 +137,7 @@ ${s.address}
 GSTIN: ${s.gstin}
 
 ━━━━━━━━━━━━━━━━━━━━
-*BILL: HTB-${o.billNo}*
+*BILL: ${o.billNo?.startsWith('HTB-') ? o.billNo : 'HTB-'+o.billNo}*
 Table: ${o.tableNo}
 ${new Date(o.date).toLocaleString("en-IN")}
 ━━━━━━━━━━━━━━━━━━━━
@@ -178,7 +178,7 @@ ${s.thankYouMsg}
         <div className="inv-m-header">
           <div className="header-left">
             <div className="live-dot"></div>
-            <span className="header-status">ORDER HTB-{o.billNo}</span>
+            <span className="header-status">ORDER {o.billNo?.startsWith('HTB-') ? o.billNo : 'HTB-'+o.billNo}</span>
           </div>
           <button className="close-btn-minimal" onClick={() => setInvoiceOrder(null)}><X size={20}/></button>
         </div>
@@ -196,7 +196,7 @@ ${s.thankYouMsg}
               <div className="bill-zig-zag-sep"></div>
 
               <div className="bill-meta-grid">
-                <div className="meta-item"><span>BILL NO</span><strong>HTB-{o.billNo}</strong></div>
+                <div className="meta-item"><span>BILL NO</span><strong>{o.billNo?.startsWith('HTB-') ? o.billNo : 'HTB-'+o.billNo}</strong></div>
                 <div className="meta-item" style={{textAlign:'right'}}><span>TABLE</span><strong>{o.tableNo}</strong></div>
                 <div className="meta-item full-row"><span>DATE</span><strong>{new Date(o.date).toLocaleString()}</strong></div>
               </div>

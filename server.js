@@ -68,7 +68,7 @@ async function startServer() {
     });
     console.log('✅ MongoDB connected');
 
-    await seedDefaultUsers();
+    // await seedDefaultUsers();
     await connectRedis();
     await warmupCache();
 

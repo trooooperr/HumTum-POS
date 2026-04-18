@@ -57,8 +57,8 @@ router.post('/', async (req, res) => {
       return await client.incr(redisCounterKey);
     })();
     
-    // Format: BILL-001
-    orderData.billNo = `BILL-${count.toString().padStart(3, '0')}`;
+    // Format: HTB-001
+    orderData.billNo = `${count.toString().padStart(3, '0')}`;
 
     const order = new Order(orderData);
     const saved = await order.save();

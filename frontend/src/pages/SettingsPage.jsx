@@ -126,8 +126,8 @@ export default function SettingsPage() {
     }
   };
 
-  const invCategories = Array.isArray(settings.inventoryCategories) ? settings.inventoryCategories : [];
-  const menuCategories = Array.isArray(settings.menuCategories) ? settings.menuCategories : [];
+  const invCategories = Array.isArray(form.inventoryCategories) ? form.inventoryCategories : [];
+  const menuCategories = Array.isArray(form.menuCategories) ? form.menuCategories : [];
 
   // Inventory category state
   const [invCatInput, setInvCatInput] = useState('');
@@ -144,79 +144,35 @@ export default function SettingsPage() {
 
 
   // Inventory category handlers (with context sync)
-  const handleAddInvCategory = async () => {
+  const handleAddInvCategory = () => {
     const cat = invCatInput.trim();
     if (!cat) return setInvCatError('Category required');
-    if (invCategories.includes(cat)) return setInvCatError('Already exists');
+    const prev = form.inventoryCategories || [];
+    if (prev.includes(cat)) return setInvCatError('Already exists');
 
     setInvCatError('');
-    const prev = invCategories;
+    setForm({ ...form, inventoryCategories: [...prev, cat] });
     setInvCatInput('');
-
-    try {
-      const res = await authFetch(apiUrl('/api/settings/inventory-category'), {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category: cat })
-      });
-      if (!res.ok) throw new Error('Failed to add');
-      const savedCats = await res.json();
-      await saveSettings({ ...settings, inventoryCategories: savedCats });
-    } catch (e) {
-      setInvCatError(e.message || 'Failed to add');
-    }
   };
-  const handleRemoveInvCategory = async (cat) => {
-    const prev = invCategories;
-
-    try {
-      const res = await authFetch(apiUrl('/api/settings/inventory-category'), {
-        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category: cat })
-      });
-      if (!res.ok) throw new Error('Failed to remove');
-      const savedCats = await res.json();
-      await saveSettings({ ...settings, inventoryCategories: savedCats });
-    } catch (e) {
-      setInvCatError(e.message || 'Failed to remove');
-    }
+  const handleRemoveInvCategory = (cat) => {
+    const prev = form.inventoryCategories || [];
+    setForm({ ...form, inventoryCategories: prev.filter(c => c !== cat) });
   };
 
   // Menu category handlers (with context sync)
-  const handleAddMenuCategory = async () => {
+  const handleAddMenuCategory = () => {
     const cat = menuCatInput.trim();
     if (!cat) return setMenuCatError('Category required');
-    if (menuCategories.includes(cat)) return setMenuCatError('Already exists');
+    const prev = form.menuCategories || [];
+    if (prev.includes(cat)) return setMenuCatError('Already exists');
 
     setMenuCatError('');
-    const prev = menuCategories;
+    setForm({ ...form, menuCategories: [...prev, cat] });
     setMenuCatInput('');
-
-    try {
-      const res = await authFetch(apiUrl('/api/settings/menu-category'), {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category: cat })
-      });
-      if (!res.ok) throw new Error('Failed to add');
-      const savedCats = await res.json();
-      await saveSettings({ ...settings, menuCategories: savedCats });
-    } catch (e) {
-      setMenuCatError(e.message || 'Failed to add');
-    }
   };
-  const handleRemoveMenuCategory = async (cat) => {
-    const prev = menuCategories;
-
-    try {
-      const res = await authFetch(apiUrl('/api/settings/menu-category'), {
-        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category: cat })
-      });
-      if (!res.ok) throw new Error('Failed to remove');
-      const savedCats = await res.json();
-      await saveSettings({ ...settings, menuCategories: savedCats });
-    } catch (e) {
-      setMenuCatError(e.message || 'Failed to remove');
-    }
+  const handleRemoveMenuCategory = (cat) => {
+    const prev = form.menuCategories || [];
+    setForm({ ...form, menuCategories: prev.filter(c => c !== cat) });
   };
 
 
