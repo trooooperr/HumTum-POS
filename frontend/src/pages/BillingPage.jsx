@@ -412,7 +412,7 @@ export default function BillingPage() {
 }
 
         .mcard-modern { background: var(--s1); border-radius: 16px; overflow: hidden; border: 1px solid var(--b1); display: flex; flex-direction: column; }
-        .mimg-container { position: relative; aspect-ratio: 1/1; width: 100%; background: #000; }
+        .mimg-container { position: relative; aspect-ratio: 1/1; width: 100%; background: #000; min-height:130px }
         .mimg-big { width: 100%; height: 100%; object-fit: cover; }
         .m-gradient-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 40%); display: flex; align-items: flex-end; padding: 8px; }
         .m-price-tag { background: var(--a); color: #000; font-size: 12px; font-weight: 900; padding: 2px 8px; border-radius: 6px; }
@@ -920,8 +920,8 @@ export default function BillingPage() {
 }
 .stock-badge {
   position: absolute;
-  bottom: 10px;
-  left: 10px;
+  top: 10px;
+  right: 10px;
   padding: 3px 8px;
   border-radius: 6px;
   font-size: 10px;

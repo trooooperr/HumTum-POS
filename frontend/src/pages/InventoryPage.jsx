@@ -108,28 +108,15 @@ function StockModal({ item, onClose, onSave }) {
 
 /* MAIN */
 export default function InventoryPage() {
-  const { settings, role, can } = useApp();
+  const { settings, role, can, inventory, setInventory } = useApp();
   const isAdmin = role === 'admin' || role === 'manager';
   const categories = Array.isArray(settings.inventoryCategories) && settings.inventoryCategories.length > 0
     ? settings.inventoryCategories
     : ['General'];
-  const [inventory, setInventory] = useState([]);
   const [modal, setModal] = useState(null);
   const [expanded, setExpanded] = useState(null);
   const [search, setSearch] = useState('');
   const [cat, setCat] = useState('All');
-
-  useEffect(() => {
-    authFetch(apiUrl('/api/inventory')).then(r=>{
-      if (!r.ok) throw new Error('Failed to fetch inventory');
-      return r.json();
-    }).then(data => {
-      setInventory(Array.isArray(data) ? data : []);
-    }).catch((err) => {
-      setInventory([]);
-      alert('Failed to load inventory: ' + err.message);
-    });
-  }, []);
 
   const adjust = async (id, val) => {
     // Optimistic local state update

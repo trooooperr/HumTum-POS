@@ -111,10 +111,10 @@ export default function SettingsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to update');
 
-      const auth = JSON.parse(localStorage.getItem('humtum_auth'));
+      const auth = JSON.parse(localStorage.getItem('humtum_auth_v2'));
       if (auth) {
         auth.user = data.user;
-        localStorage.setItem('humtum_auth', JSON.stringify(auth));
+        localStorage.setItem('humtum_auth_v2', JSON.stringify(auth));
       }
       setProfileSaved(true);
       setProfileForm(f => ({ ...f, password: '' })); // Clear password field
@@ -126,28 +126,21 @@ export default function SettingsPage() {
     }
   };
 
+  const invCategories = Array.isArray(settings.inventoryCategories) ? settings.inventoryCategories : [];
+  const menuCategories = Array.isArray(settings.menuCategories) ? settings.menuCategories : [];
+
   // Inventory category state
-  const [invCategories, setInvCategories] = useState([]);
   const [invCatInput, setInvCatInput] = useState('');
   const [invCatEdit, setInvCatEdit] = useState(null); // {old, new}
   const [invCatError, setInvCatError] = useState('');
   // Menu category state
-  const [menuCategories, setMenuCategories] = useState([]);
   const [menuCatInput, setMenuCatInput] = useState('');
   const [menuCatEdit, setMenuCatEdit] = useState(null); // {old, new}
   const [menuCatError, setMenuCatError] = useState('');
 
-  // Load categories from backend
   useEffect(() => {
     setForm({ ...settings });
   }, [settings]);
-
-  useEffect(() => {
-    authFetch(apiUrl('/api/settings')).then(r => r.json()).then(data => {
-      setInvCategories(Array.isArray(data.inventoryCategories) ? data.inventoryCategories : []);
-      setMenuCategories(Array.isArray(data.menuCategories) ? data.menuCategories : []);
-    });
-  }, []);
 
 
   // Inventory category handlers (with context sync)
@@ -158,9 +151,6 @@ export default function SettingsPage() {
 
     setInvCatError('');
     const prev = invCategories;
-    // Optimistic Update
-    const newCats = [...invCategories, cat];
-    setInvCategories(newCats);
     setInvCatInput('');
 
     try {
@@ -170,18 +160,13 @@ export default function SettingsPage() {
       });
       if (!res.ok) throw new Error('Failed to add');
       const savedCats = await res.json();
-      setInvCategories(savedCats);
       await saveSettings({ ...settings, inventoryCategories: savedCats });
     } catch (e) {
-      setInvCategories(prev); // Rollback
       setInvCatError(e.message || 'Failed to add');
     }
   };
   const handleRemoveInvCategory = async (cat) => {
     const prev = invCategories;
-    // Optimistic Update
-    const newCats = invCategories.filter(c => c !== cat);
-    setInvCategories(newCats);
 
     try {
       const res = await authFetch(apiUrl('/api/settings/inventory-category'), {
@@ -190,10 +175,8 @@ export default function SettingsPage() {
       });
       if (!res.ok) throw new Error('Failed to remove');
       const savedCats = await res.json();
-      setInvCategories(savedCats);
       await saveSettings({ ...settings, inventoryCategories: savedCats });
     } catch (e) {
-      setInvCategories(prev); // Rollback
       setInvCatError(e.message || 'Failed to remove');
     }
   };
@@ -206,9 +189,6 @@ export default function SettingsPage() {
 
     setMenuCatError('');
     const prev = menuCategories;
-    // Optimistic Update
-    const newCats = [...menuCategories, cat];
-    setMenuCategories(newCats);
     setMenuCatInput('');
 
     try {
@@ -218,18 +198,13 @@ export default function SettingsPage() {
       });
       if (!res.ok) throw new Error('Failed to add');
       const savedCats = await res.json();
-      setMenuCategories(savedCats);
       await saveSettings({ ...settings, menuCategories: savedCats });
     } catch (e) {
-      setMenuCategories(prev); // Rollback
       setMenuCatError(e.message || 'Failed to add');
     }
   };
   const handleRemoveMenuCategory = async (cat) => {
     const prev = menuCategories;
-    // Optimistic Update
-    const newCats = menuCategories.filter(c => c !== cat);
-    setMenuCategories(newCats);
 
     try {
       const res = await authFetch(apiUrl('/api/settings/menu-category'), {
@@ -238,10 +213,8 @@ export default function SettingsPage() {
       });
       if (!res.ok) throw new Error('Failed to remove');
       const savedCats = await res.json();
-      setMenuCategories(savedCats);
       await saveSettings({ ...settings, menuCategories: savedCats });
     } catch (e) {
-      setMenuCategories(prev); // Rollback
       setMenuCatError(e.message || 'Failed to remove');
     }
   };

@@ -308,6 +308,12 @@ export function AppProvider({ children }) {
     return ROLE_HIERARCHY[role]?.permissions?.includes(action) || false;
   }, [role]);
 
+  const canAccessRole = useCallback((targetRole) => {
+    const myLevel  = ROLE_HIERARCHY[role]?.level || 0;
+    const tgtLevel = ROLE_HIERARCHY[targetRole?.toLowerCase()]?.level || 0;
+    return myLevel >= tgtLevel;
+  }, [role]);
+
   // ── Table helpers ────────────────────────────────────────────────
   const selectTable = useCallback((id) => setActiveTableId(id), []);
 
