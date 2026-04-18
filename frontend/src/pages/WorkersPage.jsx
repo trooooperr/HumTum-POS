@@ -131,23 +131,6 @@ export default function WorkersPage() {
   // Robust check for account activity
   const isWorkerActive = (w) => (w.userId && typeof w.userId === 'object') ? w.userId.isActive : true;
 
-  const handleToggleStatus = (w) => {
-    const currentlyActive = isWorkerActive(w);
-    const newStat = !currentlyActive;
-    
-    authFetch(apiUrl(`/api/auth/status/${w.userId._id || w.userId}`), {
-      method:'PATCH', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ isActive: newStat })
-    }).then(async (res) => {
-      if (!res.ok) {
-        const d = await res.json();
-        showToast(d.error || 'Failed to update status', 'error');
-        return;
-      }
-      showToast(`${w.name} is now ${newStat ? 'Active' : 'Disabled'}`);
-      updateWorkerStatus(w.userId._id || w.userId, newStat); 
-    });
-  }
 
   return (
     <div className="fi">
@@ -193,11 +176,6 @@ export default function WorkersPage() {
                   <tr style={{ opacity: isActive ? 1 : 0.6 }}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ 
-                          width: 8, height: 8, borderRadius: '50%', 
-                          background: isActive ? '#22C55E' : '#EF4444', 
-                          boxShadow: isActive ? '0 0 10px rgba(34, 197, 94, 0.5)' : 'none' 
-                        }} />
                         <strong style={{color:'var(--t0)'}}>{w.name}</strong>
                       </div>
                     </td>
@@ -246,11 +224,10 @@ export default function WorkersPage() {
         {/* TOP SECTION */}
         <div style={{display:'flex', justifyContent:'space-between', marginBottom:12}}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: isActive ? 'var(--green)' : 'var(--red)', marginTop: 6 }} />
             <div>
               <div style={{fontWeight:700, color:'var(--t0)'}}>{w.name}</div>
               <div className="ph-sub">
-                {isActive ? '' : 'Account Disabled • '}{w.role} • {new Date(w.joiningDate).getDate()}th
+                {w.role} • {new Date(w.joiningDate).getDate()}th
               </div>
             </div>
           </div>
@@ -270,11 +247,6 @@ export default function WorkersPage() {
         </div>
 
         {/* STATUS BAR (MOBILE) */}
-        {w.userId && !w.userId?.isActive && (
-          <div style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--red)', padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 800, textTransform: 'uppercase', marginBottom: 12, textAlign: 'center' }}>
-            Account Disabled
-          </div>
-        )}
 
         {/* ACTION BUTTONS */}
         <div style={{
@@ -310,15 +282,6 @@ export default function WorkersPage() {
             <Trash2 size={14}/>
           </button>
 
-          {w.userId && canManage(w) && (
-            <button 
-              className={`btn btn-sm ${isActive ? 'btn-danger' : 'btn-success'}`}
-              style={{ flex: 1.5, fontSize: 10 }}
-              onClick={() => handleToggleStatus(w)}
-            >
-              {isActive ? 'Disable ID' : 'Enable ID'}
-            </button>
-          )}
         </div>
 
         {/* ✅ DELETE CONFIRMATION (NEW) */}

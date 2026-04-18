@@ -2,9 +2,9 @@ import React, { createContext, useContext, useState, useMemo, useCallback, useEf
 import { apiUrl, authFetch } from '../lib/api';
 
 const AppContext = createContext(null);
-const TABLES_KEY = 'humtum_table_bills';
-const AUTH_KEY   = 'humtum_auth';
-const TOKEN_KEY  = 'humtum_token';
+const TABLES_KEY = 'humtum_table_bills_v2';
+const AUTH_KEY   = 'humtum_auth_v2';
+const TOKEN_KEY  = 'humtum_token_v2';
 
 // ── Role hierarchy ──────────────────────────────────────────────
 // admin > manager > staff  (admin can access all lower role views)
@@ -93,12 +93,21 @@ export function AppProvider({ children }) {
   });
 
   // ── Settings ────────────────────────────────────────────────────
-  const [settings, setSettings] = useState(() => {
+  const [settings, _setSettings] = useState(() => {
     try {
       const cached = localStorage.getItem(SETTINGS_CACHE);
       return cached ? { ...DEFAULT_SETTINGS, ...JSON.parse(cached) } : DEFAULT_SETTINGS;
     } catch { return DEFAULT_SETTINGS; }
   });
+
+  const setSettings = useCallback((updater) => {
+    _setSettings(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      if (JSON.stringify(next) === JSON.stringify(prev)) return prev;
+      localStorage.setItem(SETTINGS_CACHE, JSON.stringify(next));
+      return next;
+    });
+  }, []);
 
   const saveSettings = useCallback(async (updates) => {
     const previousSettings = settings;
@@ -254,21 +263,10 @@ export function AppProvider({ children }) {
     }
   }, []);
 
-  const role = currentUser?.role || 'staff';
-  const can  = useCallback((action) => {
-    return ROLE_HIERARCHY[role]?.permissions.includes(action) || false;
-  }, [role]);
-
-  // Admin can switch to any lower role view; manager can switch to staff
-  const canAccessRole = useCallback((targetRole) => {
-    const myLevel  = ROLE_HIERARCHY[role]?.level || 0;
-    const tgtLevel = ROLE_HIERARCHY[targetRole]?.level || 0;
-    return myLevel >= tgtLevel;
-  }, [role]);
-
-  // ── Data loading (with Promise.allSettled for resilience) ──────
-  // ── Data loading (with Promise.allSettled for resilience) ──────
+  const isFetching = React.useRef(false);
   const loadData = useCallback(async (isSilent = false) => {
+    if (isFetching.current) return;
+    isFetching.current = true;
     if (!isSilent) setLoading(true);
     setError(null);
     try {
@@ -277,33 +275,38 @@ export function AppProvider({ children }) {
         safeFetch(apiUrl('/api/orders')),
         safeFetch(apiUrl('/api/workers')),
         safeFetch(apiUrl('/api/inventory')),
+        safeFetch(apiUrl('/api/settings')),
       ]);
 
-      const menuData      = results[0].status === 'fulfilled' ? results[0].value : [];
-      const ordersData    = results[1].status === 'fulfilled' ? results[1].value : [];
-      const workersData   = results[2].status === 'fulfilled' ? results[2].value : [];
-      const inventoryData = results[3].status === 'fulfilled' ? results[3].value : [];
-
-      setMenuItems(menuData);
-      setOrderHistory([...ordersData].sort((a,b) => new Date(b.date)-new Date(a.date)));
-      setWorkers(workersData);
-      setInventory(inventoryData);
-
-      localStorage.setItem(MENU_CACHE, JSON.stringify(menuData));
-      localStorage.setItem(WORKERS_CACHE, JSON.stringify(workersData));
-      localStorage.setItem(INVENTORY_CACHE, JSON.stringify(inventoryData));
-
-      // Check if any failed
-      const failed = results.filter(r => r.status === 'rejected');
-      if (failed.length > 0 && !isSilent) {
-        setError('Some data failed to load. Try refreshing.');
+      if (results[0].status === 'fulfilled') {
+        setMenuItems(results[0].value);
+        localStorage.setItem(MENU_CACHE, JSON.stringify(results[0].value));
       }
+      if (results[1].status === 'fulfilled') setOrderHistory([...results[1].value].sort((a,b)=>new Date(b.date)-new Date(a.date)));
+      if (results[2].status === 'fulfilled') {
+        setWorkers(results[2].value);
+        localStorage.setItem(WORKERS_CACHE, JSON.stringify(results[2].value));
+      }
+      if (results[3].status === 'fulfilled') {
+        setInventory(results[3].value);
+        localStorage.setItem(INVENTORY_CACHE, JSON.stringify(results[3].value));
+      }
+      if (results[4].status === 'fulfilled' && results[4].value && !Array.isArray(results[4].value)) {
+        setSettings(results[4].value);
+      }
+
     } catch (err) {
-      if (!isSilent) setError('Failed to load data. Please retry.');
+      if (!isSilent) setError('Failed to load data');
     } finally {
       if (!isSilent) setLoading(false);
+      isFetching.current = false;
     }
-  }, []);
+  }, [setMenuItems, setWorkers, setInventory, setSettings]);
+
+  const role = (currentUser?.role || 'staff').toLowerCase();
+  const can = useCallback((action) => {
+    return ROLE_HIERARCHY[role]?.permissions?.includes(action) || false;
+  }, [role]);
 
   // ── Table helpers ────────────────────────────────────────────────
   const selectTable = useCallback((id) => setActiveTableId(id), []);
@@ -356,20 +359,51 @@ export function AppProvider({ children }) {
     return { subtotal, sgst, cgst, discountAmount, grandTotal, roundOff };
   }, [tableBills, activeTableId, settings]);
 
-  // ── Filtered menu ────────────────────────────────────────────────
+  // ── All sellable items (Menu + Inventory drink items) ─────────────
+  const allSellableItems = useMemo(() => {
+    const menu = menuItems || [];
+    const inv  = inventory || [];
+
+    const getImg = (item) => {
+      if (item.imageUrl && item.imageUrl.startsWith('http')) return item.imageUrl;
+      const cat = item.category?.toLowerCase() || '';
+      if (cat.includes('beer')) return 'https://images.unsplash.com/photo-1608270586620-248524c67de9?w=320';
+      if (cat.includes('liquor')) return 'https://images.unsplash.com/photo-1527281400683-19dd761dc442?w=320';
+      if (cat.includes('soft') || cat.includes('can')) return 'https://images.unsplash.com/photo-1622708782522-d19597a94c21?w=320';
+      if (cat.includes('main') || cat.includes('starter')) return 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=320';
+      return `https://placehold.co/320x320/171921/F59E0B?text=${encodeURIComponent(item.name?.slice(0,1) || 'I')}`;
+    };
+
+    const drinkItems = inv.map(i => ({ 
+      ...i, 
+      imageUrl: getImg(i),
+      available: i.stock > 0, 
+      isInventory: true 
+    }));
+    
+    const processedMenu = menu.map(m => ({
+      ...m,
+      imageUrl: getImg(m),
+      available: m.available !== false,
+      isInventory: false
+    }));
+
+    return [...processedMenu, ...drinkItems];
+  }, [menuItems, inventory]);
+
   const filteredMenu = useMemo(() => {
-    if (!Array.isArray(menuItems)) return [];
-    return menuItems.filter(item => {
+    return allSellableItems.filter(item => {
       const mc = categoryFilter === 'All' || item.category === categoryFilter;
       const ms = item.name.toLowerCase().includes(menuSearch.toLowerCase());
       return mc && ms;
     });
-  }, [menuItems, categoryFilter, menuSearch]);
+  }, [allSellableItems, categoryFilter, menuSearch]);
 
   const categories = useMemo(() => {
-    if (!Array.isArray(menuItems)) return ['All'];
-    return ['All', ...new Set(menuItems.map(i => i.category))];
-  }, [menuItems]);
+    const mc = Array.isArray(settings.menuCategories) ? settings.menuCategories : [];
+    const ic = Array.isArray(settings.inventoryCategories) ? settings.inventoryCategories : [];
+    return ['All', ...new Set([...mc, ...ic])];
+  }, [settings]);
 
   const getTableStatus = useCallback((tableId) => {
     const t = tableBills[tableId];
@@ -483,6 +517,22 @@ export function AppProvider({ children }) {
     }));
   }, []);
 
+  const saveInventoryItem = useCallback(async (data, id) => {
+    const method = id ? 'PUT' : 'POST';
+    const url    = id ? apiUrl(`/api/inventory/${id}`) : apiUrl('/api/inventory');
+    const res    = await authFetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
+    if (!res.ok) throw new Error('Failed to save inventory');
+    const saved = await res.json();
+    setInventory(prev => id ? prev.map(i=>i._id===id?saved:i) : [...prev, saved]);
+    return saved;
+  }, []);
+
+  const deleteInventoryItem = useCallback(async (id) => {
+    const res = await authFetch(apiUrl(`/api/inventory/${id}`), { method:'DELETE' });
+    if (!res.ok) throw new Error('Failed to delete');
+    setInventory(prev => prev.filter(i=>i._id!==id));
+  }, []);
+
   const settleOrder = useCallback(async (orderId, paidAmount, paymentMode) => {
     try {
       const res = await authFetch(apiUrl(`/api/orders/${orderId}/settle`), {
@@ -509,10 +559,12 @@ export function AppProvider({ children }) {
       activeSection, setActiveSection,
       sidebarOpen, setSidebarOpen,
       menuItems, orderHistory, workers,
+      inventory, setInventory,
+      saveInventoryItem, deleteInventoryItem,
       loading, error, loadData,
       tableBills, activeTableId, selectTable,
       updateTableItem, clearTable, setTableField,
-      billTotals, filteredMenu, categories,
+      allSellableItems, billTotals, filteredMenu, categories,
       categoryFilter, setCategoryFilter,
       menuSearch, setMenuSearch,
       getTableStatus, generateBill, settleOrder,

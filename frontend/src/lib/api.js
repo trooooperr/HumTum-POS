@@ -19,7 +19,7 @@ export function apiUrl(path) {
  * Authenticated fetch — automatically includes JWT token
  */
 export async function authFetch(url, options = {}) {
-  const token = localStorage.getItem('humtum_token');
+  const token = localStorage.getItem('humtum_token_v2');
   const headers = {
     ...options.headers,
   };
@@ -37,8 +37,8 @@ export async function authFetch(url, options = {}) {
 
   // Auto-logout on 401 (token expired)
   if (res.status === 401) {
-    localStorage.removeItem('humtum_token');
-    localStorage.removeItem('humtum_auth');
+    localStorage.removeItem('humtum_token_v2');
+    localStorage.removeItem('humtum_auth_v2');
     // Don't reload if we're already on the login page
     if (window.location.pathname !== '/login') {
       window.location.reload();

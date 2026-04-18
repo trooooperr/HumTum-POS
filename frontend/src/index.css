@@ -360,3 +360,42 @@ input:checked+.tslider:before { transform:translateX(18px) }
 
 @keyframes fi { from{opacity:0} to{opacity:1} }
 @keyframes su { from{opacity:0;transform:translateY(20px) scale(0.98)} to{opacity:1;transform:translateY(0) scale(1)} }
+
+/* ── Stock Badge ────────────────────────────────── */
+.stock-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: fit-content;
+  white-space: nowrap;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 900;
+  color: #000;
+  background: var(--a);
+  z-index: 52;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.stock-badge.low { background: var(--red); color: #fff; }
+
+.sold-out-badge-top {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: var(--red);
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 900;
+  z-index: 52;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+.m-price-tag {
+  z-index: 4;
+}

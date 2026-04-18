@@ -22,12 +22,10 @@ function MenuItem({ item, qty, add, rem, stock }) {
     <div className={`mcard-modern${!item.available?' na':''}`}>
       <div className="mimg-container">
         <img className="mimg-big" src={src} alt={item.name} onError={e=>{e.target.src=`https://placehold.co/320x320/171921/F59E0B?text=${encodeURIComponent(item.name.slice(0,1))}`}}/>
-        <div className="m-gradient-overlay">
-            <div className="m-price-tag">₹{item.price.toFixed(0)}</div>
-        </div>
-        {!item.available && <div className="sold-out-badge-top">SOLD OUT</div>}
+        <div className="m-price-tag" style={{ position:'absolute', bottom:8, left:8, zIndex:5 }}>₹{item.price.toFixed(0)}</div>
+        {!item.available && <div className="sold-out-badge-top" style={{ top: 8, left: 8, right: 'auto' }}>SOLD OUT</div>}
         {stock !== undefined && (
-          <div className="stock-badge" style={{ background: stock <= 5 ? 'var(--red)' : 'var(--s3)' }}>
+          <div className={`stock-badge ${stock <= 5 ? 'low' : ''}`} style={{ top: 8, right: 8 }}>
             Stock: {stock}
           </div>
         )}

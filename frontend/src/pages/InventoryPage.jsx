@@ -208,10 +208,13 @@ export default function InventoryPage() {
     }
   }
 
-  const filtered = inventory.filter(i =>
-    i.name && i.name.toLowerCase().includes(search.toLowerCase()) &&
-    (cat==='All' || i.category===cat)
-  );
+  const drinkCats = ['alcohol', 'beer', 'soda', 'liquor', 'soft drink', 'can', 'cold drink', 'beverages', 'spirits', 'wine', 'whiskey', 'vodka', 'rum', 'gin'];
+  const filtered = inventory.filter(i => {
+    const nameMatch = i.name && i.name.toLowerCase().includes(search.toLowerCase());
+    const catMatch  = (cat === 'All' || i.category === cat);
+    const isDrink   = drinkCats.some(dc => i.category?.toLowerCase().includes(dc));
+    return nameMatch && catMatch && isDrink;
+  });
 
   return (
     <div className="fi">
