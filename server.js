@@ -1,6 +1,6 @@
 require('dotenv').config();
 
-const mongoose = require('mongoose');
+const mongoose = require('mongoose'); // Fresh start
 const cron = require('node-cron');
 
 const app = require('./app');
