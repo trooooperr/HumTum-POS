@@ -296,32 +296,32 @@ ${s.thankYouMsg}
           box-shadow: 0 10px 30px rgba(0,0,0,0.4);
         }
         .bill-inner { border: 1px solid #eee; border-radius: 8px; padding: 18px; color: #000; font-family: 'Courier New', Courier, monospace; }
-        .bill-name-heavy { font-size: 22px; font-weight: 900; text-align: center; color: #000; }
-        .bill-sub-info { font-size: 10px; text-align: center; color: #666; text-transform: uppercase; }
+        .bill-name-heavy { font-size: 26px; font-weight: 900; text-align: center; color: #000; }
+        .bill-sub-info { font-size: 13px; text-align: center; color: #666; text-transform: uppercase; margin-bottom: 2px; }
         .bill-zig-zag-sep { border-top: 1px dashed #ddd; margin: 15px 0; }
         
-        .bill-meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 11px; }
-        .meta-item span { display: block; color: #999; font-size: 9px; font-weight: bold; margin-bottom: 2px; }
+        .bill-meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px; }
+        .meta-item span { display: block; color: #999; font-size: 11px; font-weight: bold; margin-bottom: 2px; }
         .full-row { grid-column: span 2; }
 
-        .bill-items-table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 12px; }
-        .bill-items-table th { border-bottom: 1px solid #000; padding-bottom: 5px; font-size: 10px; color: #888; }
+        .bill-items-table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 15px; }
+        .bill-items-table th { border-bottom: 1px solid #000; padding-bottom: 5px; font-size: 13px; color: #888; }
         .item-name-bold { font-weight: bold; padding: 5px 0; }
 
         .bill-summary-stack { display: flex; flex-direction: column; gap: 4px; }
-        .sum-row { display: flex; justify-content: space-between; font-size: 11px; color: #444; }
+        .sum-row { display: flex; justify-content: space-between; font-size: 14px; color: #444; margin-bottom: 2px; }
         .discount { color: #d32f2f; font-weight: bold; }
         
         .grand-total-box { 
           margin: 10px 0; padding: 12px; background: #f8f9fa; border-radius: 8px; text-align: center;
           border: 1px solid #eee;
         }
-        .grand-label { font-size: 10px; font-weight: 800; color: #888; }
-        .grand-value { font-size: 24px; font-weight: 900; color: #000; }
+        .grand-label { font-size: 13px; font-weight: 800; color: #888; }
+        .grand-value { font-size: 28px; font-weight: 900; color: #000; }
         
-        .due-row { color: #d32f2f; font-weight: 900; font-size: 13px; margin-top: 4px; }
+        .due-row { color: #d32f2f; font-weight: 900; font-size: 16px; margin-top: 4px; }
         .paid-row { border-top: 1px solid #eee; padding-top: 5px; margin-top: 5px; }
-        .bill-footer-note { text-align: center; font-size: 10px; margin-top: 15px; color: #999; font-weight: bold; }
+        .bill-footer-note { text-align: center; font-size: 12px; margin-top: 15px; color: #999; font-weight: bold; }
 
         /* Share Control Styling */
         .share-section-card { background: #12141a; border-radius: 20px; padding: 15px; border: 1px solid #1c1e21; }

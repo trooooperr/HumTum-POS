@@ -241,12 +241,20 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
-// ── Admin-led Worker Password & Email Reset ──────────────────────
 router.patch('/reset-worker-password/:id', requireAuth, async (req, res) => {
   try {
     const { newPassword, forceReset, newEmail } = req.body;
-    
+    const caller = await User.findById(req.user.id);
+    if (!caller) return res.status(401).json({ error: 'Caller account not found' });
+    const callerRole = caller.role?.toLowerCase();
+
     if (req.params.id === 'staff_team') {
+       if (callerRole !== 'admin' && callerRole !== 'manager') {
+         return res.status(403).json({ error: 'Unauthorized: Only admin or manager can reset staff team password' });
+       }
+       if (!newPassword || newPassword.length < 6) {
+         return res.status(400).json({ error: 'Password must be at least 6 characters' });
+       }
        const salt = await require('bcryptjs').genSalt(12);
        const hashed = await require('bcryptjs').hash(newPassword, salt);
        await User.updateMany({ role: 'staff' }, { 
@@ -257,6 +265,12 @@ router.patch('/reset-worker-password/:id', requireAuth, async (req, res) => {
     }
 
     if (req.params.id === 'manager_team') {
+       if (callerRole !== 'admin') {
+         return res.status(403).json({ error: 'Unauthorized: Only admin can reset manager team password' });
+       }
+       if (!newPassword || newPassword.length < 6) {
+         return res.status(400).json({ error: 'Password must be at least 6 characters' });
+       }
        const salt = await require('bcryptjs').genSalt(12);
        const hashed = await require('bcryptjs').hash(newPassword, salt);
        await User.updateMany({ role: 'manager' }, { 
@@ -266,7 +280,7 @@ router.patch('/reset-worker-password/:id', requireAuth, async (req, res) => {
        return res.json({ success: true, message: 'Manager account updated!' });
     }
 
-    const currentAdmin = await User.findById(req.user.id);
+    const currentAdmin = caller;
     const targetUser  = await User.findById(req.params.id);
 
     if (!currentAdmin) return res.status(401).json({ error: 'Administrator account not found' });
@@ -331,6 +345,8 @@ async function seedDefaultUsers() {
     console.log('📦 Synchronizing default users...');
     const defaults = [
       { name: 'Owner', username: 'admin', passwordHash: 'admin123', role: 'admin', email: process.env.ADMIN_EMAIL || 'shubhampriy11@gmail.com' },
+      { name: 'Manager', username: 'manager', passwordHash: 'manager123', role: 'manager', email: process.env.MANAGER_EMAIL || 'manager@example.com' },
+      { name: 'Staff', username: 'staff', passwordHash: 'staff123', role: 'staff', email: process.env.STAFF_EMAIL || 'staff@example.com' },
     ];
 
     for (const u of defaults) {

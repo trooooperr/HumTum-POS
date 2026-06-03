@@ -3,10 +3,12 @@ const Worker = require('../models/Worker');
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
 const { getCache, setCache, deleteCache } = require('../lib/redis');
+const { requireRole } = require('../middleware/auth');
 const router = express.Router();
 
 const WORKERS_CACHE_KEY = 'workers:all';
 
+// GET workers list (Allowed for all authenticated staff for table assignments)
 router.get('/', async (req, res) => {
   try {
     const cached = await getCache(WORKERS_CACHE_KEY);
@@ -18,14 +20,31 @@ router.get('/', async (req, res) => {
   }
   catch (err) { res.status(500).json({ message: err.message }); }
 });
-router.get('/:id/history', async (req, res) => {
+
+// GET worker salary/payment history (Admin/Manager only)
+router.get('/:id/history', requireRole(['admin', 'manager']), async (req, res) => {
   try {
     const history = await Transaction.find({ workerId: req.params.id }).sort({ date: -1 });
     res.json(history);
   } catch (err) { res.status(500).json({ message: err.message }); }
 });
-router.post('/', async (req, res) => {
-  try {
+
+// CREATE worker (Admin/Manager only)
+router.post(
+  '/',
+  requireRole(['admin', 'manager']),
+  (req, res, next) => {
+    const { name, role, salary } = req.body;
+    if (!name || typeof name !== 'string' || name.trim() === '') {
+      return res.status(400).json({ message: 'Valid worker name is required.' });
+    }
+    if (salary != null && (isNaN(salary) || Number(salary) < 0)) {
+      return res.status(400).json({ message: 'Salary must be a non-negative number.' });
+    }
+    next();
+  },
+  async (req, res) => {
+    try {
     const workerData = req.body;
     // --- AUTO LOGIN ACCOUNT LOGIC ---
     let userId = null;
@@ -75,8 +94,23 @@ router.post('/', async (req, res) => {
     res.status(201).json(savedWorker);
   } catch (err) { res.status(400).json({ message: err.message }); }
 });
-router.put('/:id', async (req, res) => {
-  try {
+
+// UPDATE worker (Admin/Manager only)
+router.put(
+  '/:id',
+  requireRole(['admin', 'manager']),
+  (req, res, next) => {
+    const { name, salary } = req.body;
+    if (name !== undefined && (typeof name !== 'string' || name.trim() === '')) {
+      return res.status(400).json({ message: 'Worker name cannot be empty.' });
+    }
+    if (salary != null && (isNaN(salary) || Number(salary) < 0)) {
+      return res.status(400).json({ message: 'Salary must be a non-negative number.' });
+    }
+    next();
+  },
+  async (req, res) => {
+    try {
     const oldWorker = await Worker.findById(req.params.id);
     if (!oldWorker) return res.status(404).json({ message: 'Worker not found' });
     const newTotalPaid = parseFloat(req.body.paidSalary) || 0;
@@ -132,7 +166,8 @@ router.put('/:id', async (req, res) => {
   } catch (err) { res.status(400).json({ message: err.message }); }
 });
 
-router.delete('/:id', async (req, res) => {
+// DELETE worker (Admin/Manager only)
+router.delete('/:id', requireRole(['admin', 'manager']), async (req, res) => {
   try {
     const worker = await Worker.findById(req.params.id);
     if (!worker) return res.status(404).json({ message: 'Worker not found' });
@@ -140,9 +175,7 @@ router.delete('/:id', async (req, res) => {
     // Cleanup transactions
     await Transaction.deleteMany({ workerId: req.params.id });
     
-    // Optionally keep the User account but disable it? 
-    // For now, we'll just unlink it from the worker record if we want to delete perfectly.
-    // Or just delete the worker record and leave the user document alone.
+    // Delete worker record
     await Worker.findByIdAndDelete(req.params.id);
 
     await deleteCache(WORKERS_CACHE_KEY);

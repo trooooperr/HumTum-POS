@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import Sidebar from './components/Sidebar';
 import InvoiceModal from './components/InvoiceModal';
+import HumTumBar from './components/HumTumBar';
 import LoginPage from './pages/LoginPage';
 import BillingPage from './pages/BillingPage';
 import MenuPage from './pages/MenuPage';
@@ -10,21 +11,43 @@ import SalesPage from './pages/SalesPage';
 import WorkersPage from './pages/WorkersPage';
 import InventoryPage from './pages/InventoryPage';
 import SettingsPage from './pages/SettingsPage';
+import KitchenDisplay from './pages/KitchenDisplay';
 import { Menu } from 'lucide-react';
 import './index.css';
 import Toast from './components/Toast';
 
 function Shell() {
-  const { currentUser, activeSection, settings, loading, error, loadData, sidebarOpen, setSidebarOpen, invoiceOrder } = useApp();
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 700 : false);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 700);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const { currentUser, activeSection, settings, loading, error, loadData, sidebarOpen, setSidebarOpen, invoiceOrder, activeTableId, showToast, tableBills, getTableStatus, NUM_TABLES } = useApp();
+
+  const pageTitles = {
+    billing: 'Billing',
+    menu: 'Menu',
+    inventory: 'Inventory',
+    orders: 'Orders',
+    sales: 'Sales',
+    workers: 'Workers',
+    settings: 'Settings',
+    kitchen: 'Kitchen Display',
+  };
+  const currentPageTitle = pageTitles[activeSection] || 'Dashboard';
+  const activeTableCount = Object.keys(tableBills || {}).filter(tableId => getTableStatus(tableId) !== 'free').length;
+  const completeTableCount = Math.max(0, NUM_TABLES - activeTableCount);
+  const tableStats = { active: activeTableCount, complete: completeTableCount };
 
   useEffect(() => {
     document.body.className = settings.darkMode ? '' : 'lm';
   }, [settings.darkMode]);
 
   useEffect(() => { if (currentUser) loadData(); }, [currentUser, loadData]);
-  
+
   // INACTIVITY TIMEOUT (30 mins)
-  const { showToast } = useApp();
   useEffect(() => {
     if (!currentUser) return;
     let timeout;
@@ -33,7 +56,7 @@ function Shell() {
       timeout = setTimeout(() => {
         showToast('Session expired due to inactivity', 'amber');
         setTimeout(() => window.location.reload(), 2000); // Give time for toast
-      }, 30 * 60 * 1000); 
+      }, 30 * 60 * 1000);
     };
     window.addEventListener('mousemove', reset);
     window.addEventListener('keydown', reset);
@@ -43,22 +66,28 @@ function Shell() {
       window.removeEventListener('keydown', reset);
       clearTimeout(timeout);
     };
-  }, [currentUser]);
+  }, [currentUser, showToast]);
 
   if (!currentUser) return <LoginPage />;
 
-  const pages = { billing:<BillingPage/>, menu:<MenuPage/>, orders:<OrdersPage/>, sales:<SalesPage/>, workers:<WorkersPage/>, inventory:<InventoryPage/>, settings:<SettingsPage/> };
+  const pages = { billing:<BillingPage/>, menu:<MenuPage/>, orders:<OrdersPage/>, sales:<SalesPage/>, workers:<WorkersPage/>, inventory:<InventoryPage/>, settings:<SettingsPage/>, kitchen:<KitchenDisplay/> };
 
-  // No more full-screen blocking loader. Shell renders immediately.
+  const hideSidebar = activeSection === 'billing' && activeTableId && isMobile;
+  const showTopBar = activeSection !== 'billing' || !activeTableId;
+  const navHint = activeSection === 'billing' ? 'BILL = Ctrl+B   ·   KOT = Ctrl+K' : '';
+
   return (
     <div className="shell">
-      <Sidebar/>
+      {!hideSidebar && <Sidebar/>}
       <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-        {/* Mobile bar */}
-        <div id="mbar" style={{ display:'none', alignItems:'center', gap:10, padding:'10px 14px', background:'var(--s1)', borderBottom:'1px solid var(--b1)', flexShrink:0 }}>
-          <button className="iBtn" onClick={()=>setSidebarOpen(o=>!o)}><Menu size={16}/></button>
-          <span style={{ fontFamily:'Pacifico,cursive', color:'var(--a)', fontSize:14 }}>HumTum</span>
-        </div>
+        {showTopBar && (
+          <HumTumBar
+            onMenuClick={()=>setSidebarOpen(true)}
+            title={currentPageTitle}
+            tableStats={tableStats}
+            hint={navHint}
+          />
+        )}
         
         {loading && (
           <div className="top-loader-line">
@@ -73,25 +102,12 @@ function Shell() {
           </div>
         )}
 
-        <main className="main">{pages[activeSection]||<BillingPage/>}</main>
+        <main className={`main${(activeSection === 'billing' || activeSection === 'kitchen' || hideSidebar) ? ' full-page-section' : ''}`}>
+          <div className="page-inner">{pages[activeSection]||<BillingPage/>}</div>
+        </main>
       </div>
       {invoiceOrder && <InvoiceModal/>}
       <Toast/>
-      <style>{`
-        @keyframes lineLoad {
-          0% { left: -40%; width: 40%; }
-          100% { left: 100%; width: 40%; }
-        }
-        .top-loader-line {
-          position: absolute; top: 0; left: 0; right: 0; height: 2px;
-          background: rgba(245, 158, 11, 0.1); z-index: 9999; overflow: hidden;
-        }
-        .top-loader-progress {
-          position: absolute; top: 0; height: 100%; background: var(--gold);
-          animation: lineLoad 1.5s infinite ease-in-out;
-        }
-        @media(max-width:900px){#mbar{display:flex!important}}
-      `}</style>
     </div>
   );
 }

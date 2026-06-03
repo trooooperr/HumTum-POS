@@ -2,11 +2,11 @@ config:
   target: "http://localhost:3000"
   phases:
     - duration: 30
-      arrivalRate: 10   # warm-up
+      arrivalRate: 10   # initial load test
     - duration: 60
-      arrivalRate: 50  # load test
+      arrivalRate: 50  # intermediate load test
     - duration: 60
-      arrivalRate: 100 # stress test
+      arrivalRate: 100 # advanced load test
 
 scenarios:
   - flow:

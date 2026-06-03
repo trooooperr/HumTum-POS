@@ -1,15 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { Search, Trash2, X, ShoppingCart, ChevronUp, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Search, Trash2, Printer, UtensilsCrossed } from 'lucide-react';
+import './BillingPage.css';
 
-const PM = ['cash','card','upi'];
+const PM = ['cash', 'card', 'upi'];
 
 /* COMPACT TABLE PILL */
 function TableCard({ id, isActive, status, num, onClick }) {
   return (
-    <button className={`tcard-mini ${status}${isActive?' active':''}`} onClick={onClick}>
+    <button className={`tcard-mini ${status}${isActive ? ' active' : ''}`} onClick={onClick}>
       <span className="tnum-mini">{num}</span>
-      <div className={`tstatus-dot ${status}`}/>
+      <div className={`tstatus-dot ${status}`} />
+    </button>
+  );
+}
+
+function TableTile({ id, status, num, total, items, currency, onClick }) {
+  const statusLabel = status === 'occupied' ? 'Running' : status === 'due' ? 'Due' : 'Free';
+
+  return (
+    <button className={`table-tile ${status}`} onClick={onClick}>
+      <div className="table-tile-top">
+        <span className="table-tile-number">T{num}</span>
+        <span className={`table-tile-status ${status}`}>{statusLabel}</span>
+      </div>
+      <div className="table-tile-meta">
+        <span>{items} item{items === 1 ? '' : 's'}</span>
+        <strong>{currency}{total.toFixed(0)}</strong>
+      </div>
     </button>
   );
 }
@@ -17,12 +35,12 @@ function TableCard({ id, isActive, status, num, onClick }) {
 /* IMAGE-FOCUS MENU ITEM */
 function MenuItem({ item, qty, add, rem, stock, minStock }) {
   const src = item.imageUrl?.startsWith('http') ? item.imageUrl
-    : `https://placehold.co/320x320/171921/F59E0B?text=${encodeURIComponent(item.name.slice(0,1))}`;
+    : `https://placehold.co/320x320/171921/F59E0B?text=${encodeURIComponent(item.name.slice(0, 1))}`;
   return (
-    <div className={`mcard-modern${!item.available?' na':''}`}>
+    <div className={`mcard-modern${!item.available ? ' na' : ''}`}>
       <div className="mimg-container">
-        <img className="mimg-big" src={src} alt={item.name} onError={e=>{e.target.src=`https://placehold.co/320x320/171921/F59E0B?text=${encodeURIComponent(item.name.slice(0,1))}`}}/>
-        <div className="m-price-tag" style={{ position:'absolute', bottom:8, left:8, zIndex:5 }}>₹{item.price.toFixed(0)}</div>
+        <img className="mimg-big" src={src} alt={item.name} onError={e => { e.target.src = `https://placehold.co/320x320/171921/F59E0B?text=${encodeURIComponent(item.name.slice(0, 1))}` }} />
+        <div className="m-price-tag" style={{ position: 'absolute', bottom: 8, left: 8, zIndex: 5 }}>₹{item.price.toFixed(0)}</div>
         {!item.available && <div className="sold-out-badge-top" style={{ top: 8, left: 8, right: 'auto' }}>SOLD OUT</div>}
         {stock !== undefined && stock > 0 && (
           <div className={`stock-badge ${stock <= (minStock || 5) ? 'low' : ''}`} style={{ top: 8, right: 8 }}>
@@ -34,9 +52,9 @@ function MenuItem({ item, qty, add, rem, stock, minStock }) {
         <div className="mname-modern">{item.name}</div>
         {item.available && (
           <div className="mctrl-modern">
-            <button className="qbtn-m" onClick={()=>rem(String(item._id),'decrease')}>−</button>
-           <span className="qnum-m" style={{ fontSize: '14px' }}>{qty}</span>
-            <button className="qbtn-m" onClick={()=>add(String(item._id),'increase')}>+</button>
+            <button className="qbtn-m" onClick={() => rem(String(item._id), 'decrease')}>−</button>
+            <span className="qnum-m" style={{ fontSize: '14px' }}>{qty}</span>
+            <button className="qbtn-m" onClick={() => add(String(item._id), 'increase')}>+</button>
           </div>
         )}
       </div>
@@ -44,899 +62,815 @@ function MenuItem({ item, qty, add, rem, stock, minStock }) {
   );
 }
 
+// PayModal and settle UI removed — printing handled directly via doGen/printFinalBill
 
-function PayModal({ total, currency, onClose, onConfirm }) {
-  const [paid, setPaid] = useState('');
-  const p = parseFloat(paid) || 0;
-  const isPrintOnly = p === 0;
-
+/* ─── BILLING NAV BAR ─────────────────────────────────────────── */
+function BillingNavBar({
+  activeTableId, occupiedCount, totalTables,
+  onBack, onPrintKOT, onPrintBill,
+  pendingCount = 0, allCount = 0, busy = false
+}) {
+  const vacantCount = totalTables - occupiedCount;
   return (
-    <div className="moverlay">
-      <div className="settle-card animate-su" style={{ maxWidth: 380 }}>
-
-        {/* Header */}
-        <div className="settle-banner" style={{ padding: '18px 18px 20px' }}>
-          <button 
-            onClick={onClose} 
-            className="iBtn"
-            style={{ position: 'absolute', top: 10, right: 10 }}
-          >
-            <X size={16}/>
+    <div className="billing-navbar">
+      {/* LEFT: Back + Title */}
+      <div className="bnav-left">
+        {onBack && (
+          <button className="bnav-back-btn" onClick={onBack} title="Back to Tables (Esc)">
+            <ArrowLeft size={15} />
           </button>
+        )}
+        <div className="bnav-title-group">
+          <UtensilsCrossed size={16} className="bnav-icon" />
+          <span className="bnav-title">Billing</span>
+          {activeTableId && (
+            <span className="bnav-table-badge">Table {activeTableId.substring(1)}</span>
+          )}
+        </div>
+      </div>
 
-          <div className="settle-label" style={{ fontSize: 12, color: 'var(--t2)' }}>
-            Total Payable
-          </div>
-
-          <div className="settle-amount" style={{ marginTop: 4 }}>
-            <span className="settle-currency">{currency}</span>
-            {total.toLocaleString()}
+      {/* CENTER: Shortcuts */}
+      {activeTableId && (
+        <div className="bnav-shortcuts">
+          <button
+            className="bnav-shortcut-btn kot"
+            onClick={onPrintKOT}
+            disabled={pendingCount === 0 || busy}
+            title="Print KOT (Ctrl+K)"
+          >
+            <Printer size={13} />
+            <span>KOT</span>
+            <kbd>Ctrl K</kbd>
+          </button>
+          <button
+            className="bnav-shortcut-btn bill"
+            onClick={onPrintBill}
+            disabled={allCount === 0 || busy}
+            title="Print Bill (Ctrl+B)"
+          >
+            <Printer size={13} />
+            <span>Bill</span>
+            <kbd>Ctrl B</kbd>
+          </button>
+          <div className="bnav-shortcut-btn esc" title="Back to Tables (Esc)" onClick={onBack}>
+            <span>Esc</span>
+            <kbd>↩</kbd>
           </div>
         </div>
+      )}
 
-        {/* Body */}
-        <div className="settle-input-area" style={{ padding: '16px 18px' }}>
-
-          <label 
-            className="lbl" 
-            style={{ fontSize: 11, color: 'var(--t2)', marginBottom: 6, display: 'block' }}
-          >
-            Amount Received
-          </label>
+      {/* RIGHT: Stats */}
+      <div className="bnav-stats">
+        <div className="bnav-stat occupied">
+          <span className="bnav-stat-dot occ-dot" />
           <div>
-            <input
-              type="text"   
-              inputMode="decimal"
-              value={paid}
-              onChange={(e) => setPaid(e.target.value)}
-              placeholder={total.toFixed(0)}
-              autoFocus
-              style={{
-                border: 'none',
-                outline: 'none',
-                background: 'transparent',
-                flex: 1,
-                fontSize: 18,
-                fontWeight: 900,
-                color: 'var(--t1)'
-              }}
-            />
+            <div className="bnav-stat-num">{occupiedCount}</div>
+            <div className="bnav-stat-label">Active</div>
           </div>
-
-          {/* Info */}
-          <div style={{ marginTop: 12, fontSize: 12, color: 'var(--t2)' }}>
-            {isPrintOnly 
-              ? 'No payment entered. Order will be held.' 
-              : `Received ${currency}${p.toLocaleString()}`
-            }
+        </div>
+        <div className="bnav-stat vacant">
+          <span className="bnav-stat-dot vac-dot" />
+          <div>
+            <div className="bnav-stat-num">{vacantCount}</div>
+            <div className="bnav-stat-label">Vacant</div>
           </div>
-
         </div>
-
-        {/* Footer */}
-        <div 
-          className="settle-footer"
-          style={{ padding: '14px 18px', display: 'flex', gap: 8 }}
-        >
-          <button 
-            className="btn btn-ghost btn-lg"
-            style={{ flex: 1, borderRadius: 10 }}
-            onClick={onClose}
-          >
-            Back
-          </button>
-
-          <button 
-            className={`settle-btn-main ${isPrintOnly ? 'ghost' : ''}`}
-            style={{ flex: 1, borderRadius: 10 }}
-            onClick={() => onConfirm(p)}
-          >
-            {isPrintOnly ? 'Print' : 'Print'}
-          </button>
-        </div>
-
       </div>
     </div>
   );
 }
 
 export default function BillingPage() {
-  const { tableBills, activeTableId, selectTable, updateTableItem, clearTable, setTableField, billTotals, allSellableItems, filteredMenu, categories, categoryFilter, setCategoryFilter, menuSearch, setMenuSearch, menuItems, inventory, getTableStatus, generateBill, settings, NUM_TABLES } = useApp();
+  const {
+    tableBills, setTableBills, activeTableId, selectTable, updateTableItem, clearTable, setTableField,
+    setItemNote,
+    billTotals, filteredMenu, categories, categoryFilter, setCategoryFilter,
+    menuSearch, setMenuSearch, inventory, workers, getTableStatus, settings, NUM_TABLES,
+    openTableSession, createKOT, finalizeBill, completeOrder, socket, syncTableSession
+  } = useApp();
+
   const [pm, setPm] = useState('cash');
-  const [payModal, setPayModal] = useState(false);
   const [busy, setBusy] = useState(false);
   const [mobileBillOpen, setMobileBillOpen] = useState(false);
+  const [activeOrder, setActiveOrder] = useState(null); // Current order for this table
+  const [kots, setKots] = useState([]); // KOTs for current order
+  const [orderType, setOrderType] = useState('dine-in');
+  const [selectedWaiter, setSelectedWaiter] = useState('');
+  const [billPanelWidth, setBillPanelWidth] = useState(360);
+  const [isResizing, setIsResizing] = useState(false);
+  const searchInputRef = useRef(null);
+  const billingGridRef = useRef(null);
 
-  const table = tableBills[activeTableId] || { items:[], customerPhone:'', customerName:'' };
-  const { subtotal, sgst, cgst, grandTotal, roundOff } = billTotals;
+  const table = tableBills[activeTableId] || { items: [], customerPhone: '', customerName: '', discount: '' };
   const c = settings.currency;
+  const waiterOptions = useMemo(() => {
+    return (workers || []).filter(w => {
+      const role = String(w.role || '').toLowerCase();
+      return role.includes('waiter') || role.includes('staff') || role.includes('server');
+    });
+  }, [workers]);
+
+  const selectedWaiterObj = useMemo(() => {
+    return waiterOptions.find(w => w._id === selectedWaiter) || null;
+  }, [waiterOptions, selectedWaiter]);
+
+  // Group sent KOT items and pending items
+  const combinedItems = useMemo(() => {
+    const sentMap = {};
+    (kots || []).forEach(kot => {
+      (kot.items || []).forEach(item => {
+        const id = item.menuItemId?._id || item.menuItemId;
+        const key = id || item.name;
+        if (sentMap[key]) {
+          sentMap[key].quantity += item.quantity;
+        } else {
+          sentMap[key] = {
+            _id: id,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+            isSent: true,
+            note: item.notes || ''
+          };
+        }
+      });
+    });
+
+    const pending = (table.items || []).map(item => ({
+      ...item,
+      isSent: false
+    }));
+
+    return {
+      sent: Object.values(sentMap),
+      pending,
+      all: [...Object.values(sentMap), ...pending]
+    };
+  }, [kots, table.items]);
+
+  // Combined totals
+  const totals = useMemo(() => {
+    const subtotal = combinedItems.all.reduce((s, i) => s + (i.price || 0) * (i.quantity || 0), 0);
+    const sgst = subtotal * (settings.sgstRate / 100);
+    const cgst = subtotal * (settings.cgstRate / 100);
+    const dv = (table.discount || '').trim();
+    const discountAmount = Math.round(dv.endsWith('%')
+      ? subtotal * (parseFloat(dv) / 100) || 0
+      : parseFloat(dv) || 0);
+    const rawTotal = subtotal + sgst + cgst - discountAmount;
+    const grandTotal = Math.max(0, Math.round(rawTotal));
+    const roundOff = grandTotal - rawTotal;
+    return { subtotal, sgst, cgst, discountAmount, grandTotal, roundOff };
+  }, [combinedItems.all, table.discount, settings]);
+
+  const { subtotal, sgst, cgst, discountAmount, grandTotal, roundOff } = totals;
+
+  useEffect(() => {
+    if (table.items.length === 0 && selectedWaiter) {
+      setSelectedWaiter('');
+    }
+  }, [table.items.length, selectedWaiter]);
+
+  const tableList = Array.from({ length: NUM_TABLES }, (_, i) => {
+    const id = `T${i + 1}`;
+    const bill = tableBills[id] || { items: [] };
+    const total = bill.items.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 0), 0);
+    return { id, num: i + 1, status: getTableStatus(id), items: bill.items.length, total };
+  });
+  const occupiedCount = tableList.filter(t => t.status !== 'free').length;
 
   const [billError, setBillError] = useState('');
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 700 : false);
 
-  const doGen = async paid => {
-    setPayModal(false); setBusy(true); setBillError('');
-    const r = await generateBill(pm, paid);
-    setBusy(false);
-    if (r.error) {
-      setBillError(r.error);
-      setTimeout(() => setBillError(''), 5000);
-    } else {
-      setMobileBillOpen(false);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 700);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  useEffect(() => {
+    if (!isResizing) return;
+    const onMouseMove = (event) => {
+      const container = billingGridRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const newWidth = Math.min(520, Math.max(320, rect.right - event.clientX));
+      setBillPanelWidth(newWidth);
+    };
+    const onMouseUp = () => setIsResizing(false);
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [isResizing]);
+
+
+  // When table is selected, load/open session
+  const ensureActiveOrder = async (tableIdOverride) => {
+    const targetTableId = tableIdOverride || activeTableId;
+    if (!targetTableId) return null;
+    const tableNo = parseInt(targetTableId.substring(1));
+
+    try {
+      const response = await fetch(`/api/orders/table/${tableNo}/session`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('humtum_token_v2')}`
+        }
+      });
+
+      let session;
+      if (response.ok) {
+        session = await response.json();
+      } else if (response.status === 404) {
+        session = await openTableSession(tableNo, selectedWaiterObj?.name || '', orderType);
+      } else {
+        throw new Error('Unable to load table session');
+      }
+
+      const orderId = session?.activeOrderId?._id || session?.activeOrderId || session?._id || session;
+      if (!orderId) throw new Error('Unable to determine active order');
+
+      // Map database pending items to local table format
+      const dbPendingItems = (session?.pendingItems || []).map(i => ({
+        _id: i.menuItemId?._id || i.menuItemId,
+        name: i.name,
+        quantity: i.quantity,
+        price: i.price,
+        department: i.department || 'kitchen',
+        note: i.notes || ''
+      }));
+
+      // Update local storage/state table bills
+      setTableBills(prev => ({
+        ...prev,
+        [targetTableId]: {
+          ...prev[targetTableId],
+          items: dbPendingItems,
+          customerName: session?.activeOrderId?.customerName || prev[targetTableId]?.customerName || '',
+          customerPhone: session?.activeOrderId?.customerPhone || prev[targetTableId]?.customerPhone || '',
+          discount: session?.activeOrderId?.discount?.toString() || prev[targetTableId]?.discount || ''
+        }
+      }));
+
+      setActiveOrder(orderId);
+      setKots(session?.kotIds || []);
+
+      // Update selectedWaiter and orderType from DB session
+      if (session?.waiterName) {
+        const waiter = waiterOptions.find(w => w.name === session.waiterName || w.userId?.name === session.waiterName);
+        if (waiter) setSelectedWaiter(waiter._id);
+      }
+      if (session?.orderType) {
+        setOrderType(session.orderType);
+      }
+
+      return orderId;
+    } catch (err) {
+      console.error('Load session error:', err);
+      throw err;
     }
   };
 
-  return (
-    <div className="fi billing-layout">
-      {/* 1. COMPACT TABLE STRIP */}
-      <div className="table-strip-res">
-        <div className="tgrid-res">
-          {Array.from({length:NUM_TABLES},(_,i)=>{
-            const id=`T${i+1}`, st=getTableStatus(id);
-            return <TableCard key={id} id={id} isActive={activeTableId===id} status={st} num={i+1} onClick={()=>selectTable(id)}/>;
-          })}
+  useEffect(() => {
+    if (!activeTableId) {
+      setActiveOrder(null);
+      setKots([]);
+      return;
+    }
+    const loadTableSession = async () => {
+      try {
+        await ensureActiveOrder();
+      } catch (err) {
+        console.error('Load session error:', err);
+      }
+    };
+    loadTableSession();
+  }, [activeTableId]);
+
+  // Sync changes to backend session
+  useEffect(() => {
+    if (!activeTableId || !activeOrder) return;
+    const tableNo = parseInt(activeTableId.substring(1));
+
+    const delayDebounceFn = setTimeout(() => {
+      const pendingItemsForDb = (table.items || []).map(i => ({
+        menuItemId: i._id || i.menuItemId,
+        name: i.name,
+        quantity: i.quantity,
+        price: i.price,
+        department: i.department || 'kitchen',
+        notes: i.note || ''
+      }));
+
+      syncTableSession(
+        tableNo,
+        pendingItemsForDb,
+        totals.grandTotal,
+        selectedWaiterObj?.name || '',
+        orderType
+      ).catch(() => { });
+    }, 800); // 800ms debounce
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [table.items, selectedWaiterObj, orderType, activeTableId, activeOrder, totals.grandTotal]);
+
+  // Listen to real-time socket events for current table
+  useEffect(() => {
+    if (!activeTableId || !socket) return;
+    const tableNo = parseInt(activeTableId.substring(1));
+
+    socket.emit('join-table', tableNo);
+
+    const handleUpdate = () => {
+      ensureActiveOrder().catch(() => { });
+    };
+
+    socket.on('KOT_UPDATED', handleUpdate);
+    socket.on('NEW_KOT', handleUpdate);
+    socket.on('TABLE_UPDATED', handleUpdate);
+    socket.on('ORDER_COMPLETED', handleUpdate);
+
+    return () => {
+      socket.off('KOT_UPDATED', handleUpdate);
+      socket.off('NEW_KOT', handleUpdate);
+      socket.off('TABLE_UPDATED', handleUpdate);
+      socket.off('ORDER_COMPLETED', handleUpdate);
+    };
+  }, [activeTableId, socket]);
+
+  // Print KOT
+  const printKOT = async () => {
+    try {
+      const orderId = await ensureActiveOrder();
+      if (table.items.length === 0) {
+        setBillError('Please add items first');
+        return;
+      }
+
+      setBusy(true);
+      const tableNo = parseInt(activeTableId.substring(1));
+
+      // Create KOT
+      const kot = await createKOT(
+        orderId,
+        tableNo,
+        table.items.map(i => ({
+          menuItemId: i._id,
+          name: i.name,
+          quantity: i.quantity,
+          price: i.price,
+          department: i.department || 'kitchen',
+          note: i.note || ''
+        })),
+        '',
+        selectedWaiterObj?.name || '',
+        orderType
+      );
+
+      // Add to KOT list
+      setKots(prev => [...prev, kot]);
+
+      // Print the KOT
+      printKOTDocument(kot, tableNo);
+
+      // Clear items for next KOT
+      clearTable(activeTableId);
+
+      // Clear pendingItems in DB session
+      await syncTableSession(tableNo, [], 0, selectedWaiterObj?.name || '', orderType);
+
+      setBillError('');
+      setBusy(false);
+    } catch (err) {
+      setBillError(err.message);
+      setBusy(false);
+    }
+  };
+
+  // Print final bill
+  const printFinalBill = async (paidAmount) => {
+    try {
+      const orderId = await ensureActiveOrder();
+      if (!orderId) return;
+
+      setBusy(true);
+
+      const tableNo = parseInt(activeTableId.substring(1));
+
+      // Finalize bill (combines all KOTs and leftover items)
+      await finalizeBill(
+        orderId,
+        combinedItems.all,
+        subtotal,
+        sgst,
+        cgst,
+        discountAmount,
+        roundOff,
+        grandTotal,
+        selectedWaiterObj?.name || '',
+        orderType,
+        table.customerName || '',
+        table.customerPhone || ''
+      );
+
+      // Print bill
+      printBillDocument(tableNo, { items: combinedItems.all }, grandTotal);
+
+      // Mark order as complete
+      await completeOrder(activeOrder._id || activeOrder);
+
+      // Clear table
+      clearTable(activeTableId);
+      setActiveOrder(null);
+      setKots([]);
+
+      setBillError('');
+      setBusy(false);
+    } catch (err) {
+      setBillError(err.message);
+      setBusy(false);
+    }
+  };
+
+  const printKOTDocument = (kot, tableNo) => {
+    const printWindow = window.open('', '_blank');
+    const html = `
+      <html>
+        <head>
+          <style>
+            body { font-family: monospace; max-width: 80mm; margin: 0; padding: 0; }
+            .header { text-align: center; font-weight: bold; margin-bottom: 10px; }
+            .divider { border-top: 1px dashed #000; margin: 8px 0; }
+            .item { display: flex; justify-content: space-between; margin: 4px 0; }
+            .notes { font-size: 0.9em; margin: 10px 0; border: 1px solid #000; padding: 5px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">KOT #${kot.kotNo}</div>
+          <div>Table: T${tableNo}</div>
+          <div>Time: ${new Date().toLocaleTimeString()}</div>
+          <div class="divider"></div>
+          ${kot.items.map(i => `<div class="item"><span>${i.quantity}x ${i.name}</span></div>${i.note ? `<div class="notes">Note: ${i.note}</div>` : ''}`).join('')}
+          <div class="divider"></div>
+          <div style="text-align: center; font-size: 0.85em;">${new Date().toLocaleDateString()}</div>
+        </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
+    setTimeout(() => printWindow.print(), 250);
+  };
+
+  const printBillDocument = (tableNo, table, total) => {
+    const printWindow = window.open('', '_blank');
+    const html = `
+      <html>
+        <head>
+          <style>
+            body { font-family: monospace; max-width: 80mm; margin: 0; padding: 10px; }
+            .header { text-align: center; font-weight: bold; margin-bottom: 10px; font-size: 1.2em; }
+            .subheader { text-align: center; font-size: 0.9em; margin-bottom: 10px; }
+            .divider { border-top: 1px solid #000; margin: 8px 0; }
+            .item { display: flex; justify-content: space-between; margin: 4px 0; }
+            .summary { margin: 10px 0; }
+            .total-line { display: flex; justify-content: space-between; font-weight: bold; font-size: 1.1em; margin: 8px 0; }
+            .footer { text-align: center; font-size: 0.8em; margin-top: 15px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">${settings.restaurantName}</div>
+          <div class="subheader">BILL</div>
+          <div>Table: T${tableNo}</div>
+          <div>Date: ${new Date().toLocaleDateString()}</div>
+          <div class="divider"></div>
+          ${table.items.map(i => `<div class="item"><span>${i.name}</span><span>${(i.price * i.quantity).toFixed(0)}</span></div>`).join('')}
+          <div class="divider"></div>
+          <div class="summary">
+            <div class="item"><span>Subtotal</span><span>${subtotal.toFixed(0)}</span></div>
+            <div class="item"><span>Tax</span><span>${(sgst + cgst).toFixed(0)}</span></div>
+            <div class="total-line"><span>TOTAL</span><span>${total.toFixed(0)}</span></div>
+          </div>
+          <div class="divider"></div>
+          <div class="footer">
+            <p>${settings.thankYouMsg || 'Thank you for your visit!'}</p>
+            <p>${settings.phone || ''}</p>
+          </div>
+        </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
+    setTimeout(() => printWindow.print(), 250);
+  };
+
+  const doGen = async paid => {
+    await printFinalBill(paid);
+  };
+
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        selectTable(null);
+        return;
+      }
+      if (e.defaultPrevented) return;
+      const targetTag = document.activeElement?.tagName;
+      if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(targetTag)) return;
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        printKOT();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        doGen(0);
+        return;
+      }
+      if (e.key === 'Backspace') {
+        e.preventDefault();
+        setMenuSearch(prev => prev.slice(0, -1));
+        searchInputRef.current?.focus();
+        return;
+      }
+      if (/^[a-zA-Z0-9 ]$/.test(e.key)) {
+        e.preventDefault();
+        setMenuSearch(prev => prev + e.key);
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [printKOT, doGen, selectTable]);
+
+  if (!activeTableId) {
+    return (
+      <div className="fi billing-layout">
+        <BillingNavBar
+          activeTableId={null}
+          occupiedCount={occupiedCount}
+          totalTables={NUM_TABLES}
+          onBack={null}
+          onPrintKOT={null}
+          onPrintBill={null}
+        />
+        <div className="table-picker-layout">
+          <div className="table-picker-grid">
+            {tableList.map(t => (
+              <TableTile
+                key={t.id}
+                id={t.id}
+                num={t.num}
+                status={t.status}
+                total={t.total}
+                items={t.items}
+                currency={c}
+                onClick={() => selectTable(t.id)}
+              />
+            ))}
+          </div>
         </div>
       </div>
+    );
+  }
 
-      <div className="billing-main-grid">
+  return (
+    <div className="fi billing-layout">
+      {/* BILLING NAVBAR */}
+      <BillingNavBar
+        activeTableId={activeTableId}
+        occupiedCount={occupiedCount}
+        totalTables={NUM_TABLES}
+        onBack={() => selectTable(null)}
+        onPrintKOT={printKOT}
+        onPrintBill={() => doGen(0)}
+        pendingCount={combinedItems.pending.length}
+        allCount={combinedItems.all.length}
+        busy={busy}
+      />
+
+      {/* TABLE STRIP - show only on mobile */}
+      {isMobile && (
+        <div className="table-strip-res">
+          <div className="tgrid-res">
+            {tableList.map(t => (
+              <TableCard
+                key={t.id}
+                id={t.id}
+                isActive={activeTableId === t.id}
+                status={t.status}
+                num={t.num}
+                onClick={() => selectTable(t.id)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div ref={billingGridRef} className="billing-main-grid" style={{ gridTemplateColumns: isMobile ? '1fr' : `minmax(260px, 1fr) ${billPanelWidth}px` }}>
         {/* LEFT: MENU SECTION */}
         <div className="menu-side">
           <div className="filter-bar-sticky">
-            <div className="search-wrap-mini">
-              <Search size={14} />
-              <input value={menuSearch} onChange={e=>setMenuSearch(e.target.value)} placeholder="Search..." />
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
+              <div className="search-wrap-mini" style={{ margin: 0, flex: 1 }}>
+                <Search size={14} />
+                <input value={menuSearch} onChange={e => setMenuSearch(e.target.value)} placeholder="Search menu..." ref={searchInputRef} />
+              </div>
             </div>
             <div className="cat-scroll-mini">
-              {categories.map(cat=>(
-                <button key={cat} className={`cat-pill${categoryFilter===cat?' on':''}`} onClick={()=>setCategoryFilter(cat)}>{cat}</button>
+              {categories.map(cat => (
+                <button key={cat} className={`cat-pill${categoryFilter === cat ? ' on' : ''}`} onClick={() => setCategoryFilter(cat)}>{cat}</button>
               ))}
             </div>
           </div>
 
           <div className="items-grid-modern">
-            {filteredMenu.map(item=>{
+            {filteredMenu.map(item => {
               const stockItem = inventory?.find(inv => inv.name.toLowerCase().trim() === item.name.toLowerCase().trim());
               return (
-                <MenuItem key={item._id} item={item} qty={table.items.find(i=>String(i._id)===String(item._id))?.quantity||0}
+                <MenuItem key={item._id} item={item} qty={table.items.find(i => String(i._id) === String(item._id))?.quantity || 0}
                   stock={stockItem?.stock}
                   minStock={stockItem?.minStock}
-                  add={(id,a)=>updateTableItem(activeTableId,id,a)}
-                  rem={(id,a)=>updateTableItem(activeTableId,id,a)}/>
+                  add={(id, a) => updateTableItem(activeTableId, id, a)}
+                  rem={(id, a) => updateTableItem(activeTableId, id, a)} />
               );
             })}
           </div>
         </div>
 
-        {/* RIGHT: BILL PANEL (Desktop) */}
+        {/* RIGHT: BILL PANEL */}
         <div className={`bill-panel-res ${mobileBillOpen ? 'open' : 'closed'}`}>
           <div className="mobile-handle" onClick={() => setMobileBillOpen(!mobileBillOpen)}>
             <div className="h-indicator" />
           </div>
 
-
           <div className="bill-scroll-content">
             <div className="bill-header-row">
-               <span>Table {activeTableId ? activeTableId.substring(1) : ''}</span>
-               {activeTableId && <button onClick={()=>clearTable(activeTableId)} className="trash-btn"><Trash2 size={14}/></button>}
+              <span>Table {activeTableId ? activeTableId.substring(1) : ''}</span>
+              {activeTableId && <button onClick={() => clearTable(activeTableId)} className="trash-btn"><Trash2 size={14} /></button>}
             </div>
-            
-            <input className="mini-input" value={table.customerName||''} onChange={e=>setTableField(activeTableId,'customerName',e.target.value)} placeholder="Customer Name" />
-            <input className="mini-input" value={table.customerPhone||''} onChange={e=>setTableField(activeTableId,'customerPhone',e.target.value)} placeholder="Mobile No" maxLength={10}/>
+
+            <div className="order-meta-row">
+              <div className="order-type-group">
+                {['dine-in', 'takeaway', 'delivery'].map(type => (
+                  <button
+                    key={type}
+                    className={`type-pill${orderType === type ? ' active' : ''}`}
+                    onClick={() => setOrderType(type)}
+                    type="button"
+                  >
+                    {type.replace('-', ' ').toUpperCase()}
+                  </button>
+                ))}
+              </div>
+
+              <div className="waiter-select-wrap">
+                <div className="order-meta-label">Waiter</div>
+                <select className="mini-input mini-select" value={selectedWaiter} onChange={e => setSelectedWaiter(e.target.value)}>
+                  <option value="" disabled>Select waiter</option>
+                  {waiterOptions.map(w => (
+                    <option key={w._id} value={w._id}>{w.name || w.userId?.name || w.role || 'Staff'}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="section-divider" />
+            <input className="mini-input" value={table.customerName || ''} onChange={e => setTableField(activeTableId, 'customerName', e.target.value)} placeholder="Customer Name" />
+            <input className="mini-input" value={table.customerPhone || ''} onChange={e => setTableField(activeTableId, 'customerPhone', e.target.value)} placeholder="Mobile No" maxLength={10} />
 
             <div className="bill-items-scroller">
-              {table.items.map(item=>(
-                <div key={item._id} className="b-item-row">
-                  <span className="b-item-name">{item.name}</span>
-                  <div className="b-item-ctrl">
-                    <button onClick={()=>updateTableItem(activeTableId,item._id,'decrease')}>−</button>
-                    <span>{item.quantity}</span>
-                    <button onClick={()=>updateTableItem(activeTableId,item._id,'increase')}>+</button>
-                  </div>
-                  <span className="b-item-price">{c}{(item.price*item.quantity).toFixed(0)}</span>
-                </div>
-              ))}
+              {/* New/Pending items section */}
+              {combinedItems.pending.length > 0 && (
+                <>
+                  <div className="bill-section-heading">New / Unsent Items ({combinedItems.pending.length})</div>
+                  {combinedItems.pending.map(item => (
+                    <div key={item._id} className="b-item-entry">
+                      <div className="b-item-row">
+                        <span className="b-item-name">{item.name}</span>
+                        <div className="b-item-ctrl">
+                          <button onClick={() => updateTableItem(activeTableId, item._id, 'decrease')}>−</button>
+                          <span>{item.quantity}</span>
+                          <button onClick={() => updateTableItem(activeTableId, item._id, 'increase')}>+</button>
+                        </div>
+                        <span className="b-item-price">{c}{(item.price * item.quantity).toFixed(0)}</span>
+                      </div>
+                      <textarea
+                        className="item-note"
+                        placeholder="ADD Item Notes......"
+                        value={item.note || ''}
+                        onChange={e => setItemNote(activeTableId, item._id, e.target.value)}
+                        rows={1}
+                      />
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {/* Sent KOT items section */}
+              {combinedItems.sent.length > 0 && (
+                <>
+                  <div className="bill-section-heading sent-heading">Sent to Kitchen / KOTs ({combinedItems.sent.length})</div>
+                  {combinedItems.sent.map(item => (
+                    <div key={`sent-${item._id}`} className="b-item-entry sent-item">
+                      <div className="b-item-row">
+                        <span className="b-item-name sent-name">
+                          🍳 {item.name}
+                        </span>
+                        <div className="b-item-qty-badge">
+                          Qty: {item.quantity}
+                        </div>
+                        <span className="b-item-price sent-price">
+                          {c}{(item.price * item.quantity).toFixed(0)}
+                        </span>
+                      </div>
+                      {item.note && (
+                        <div className="sent-note">
+                          ✎ Note: {item.note}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
 
+            <div className="section-divider" />
+            <div className="bill-footer">
+              <div className="bill-summary-card">
+                <div className="s-row"><span>Subtotal</span><span>{c}{subtotal.toFixed(0)}</span></div>
+                <div className="s-row"><span>Tax</span><span>{c}{(sgst + cgst).toFixed(0)}</span></div>
+                {roundOff !== 0 && (
+                  <div className="s-row" style={{ color: 'var(--t3)', fontSize: '11px', fontStyle: 'italic' }}>
+                    <span>Round Off</span>
+                    <span>{roundOff > 0 ? '+' : ''}{roundOff.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="s-row">
+                  <span>Discount</span>
+                  <input
+                    className="mini-input"
+                    style={{ width: 80, textAlign: 'right' }}
+                    value={table.discount || ''}
+                    onChange={e => setTableField(activeTableId, 'discount', e.target.value)}
+                    placeholder="0 or 10%"
+                  />
+                </div>
+                <div className="s-row total-big"><span>Total</span><span>{c}{grandTotal.toFixed(0)}</span></div>
+              </div>
 
-            <div className="bill-summary-card">
-              <div className="s-row"><span>Subtotal</span><span>{c}{subtotal.toFixed(0)}</span></div>
-              <div className="s-row"><span>Tax</span><span>{c}{(sgst+cgst).toFixed(0)}</span></div>
-              {roundOff !== 0 && (
-                <div className="s-row" style={{ color: 'var(--t3)', fontSize: '11px', fontStyle: 'italic' }}>
-                  <span>Round Off</span>
-                  <span>{roundOff > 0 ? '+' : ''}{roundOff.toFixed(2)}</span>
+              <select className="pm-select-mini" value={pm} onChange={e => setPm(e.target.value)}>
+                {PM.map(m => <option key={m} value={m}>{m.toUpperCase()}</option>)}
+              </select>
+
+              {billError && (
+                <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '7px 11px', fontSize: 11, color: '#EF4444', marginBottom: 6 }}>
+                  ⚠️ {billError}
                 </div>
               )}
-              <div className="s-row">
-                <span>Discount</span>
-                <input
-                  className="mini-input"
-                  style={{ width: 80, textAlign: 'right' }}
-                  value={table.discount || ''}
-                  onChange={e => setTableField(activeTableId, 'discount', e.target.value)}
-                  placeholder="0 or 10%"
-                />
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <button
+                  className="btn btn-ghost btn-lg"
+                  style={{ flex: 1 }}
+                  onClick={printKOT}
+                  disabled={combinedItems.pending.length === 0 || busy}
+                >
+                  <Printer size={14} /> Print KOT
+                </button>
+                <button
+                  className="btn btn-primary btn-lg"
+                  style={{ flex: 1 }}
+                  onClick={() => doGen(0)}
+                  disabled={combinedItems.all.length === 0 || busy}
+                >
+                  {busy ? 'Processing…' : 'Print Bill'}
+                </button>
               </div>
-              <div className="s-row total-big"><span>Total</span><span>{c}{grandTotal.toFixed(0)}</span></div>
             </div>
 
-            <select className="pm-select-mini" value={pm} onChange={e=>setPm(e.target.value)}>
-              {PM.map(m=><option key={m} value={m}>{m.toUpperCase()}</option>)}
-            </select>
-
-            {billError && (
-              <div style={{ background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', borderRadius:8, padding:'7px 11px', fontSize:11, color:'#EF4444', marginBottom:6 }}>
-                ⚠️ {billError}
+            {/* KOT History */}
+            {kots.length > 0 && (
+              <div style={{ marginTop: 12, padding: 8, background: 'var(--bg2)', borderRadius: 6 }}>
+                <div style={{ fontSize: 11, fontWeight: 'bold', marginBottom: 6, color: 'var(--t2)' }}>
+                  KOTs: {kots.length}
+                </div>
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  {kots.map((k, i) => (
+                    <div key={i} style={{ fontSize: 10, background: 'var(--bg1)', padding: '3px 6px', borderRadius: 4 }}>
+                      {k.kotNo || `KOT-${i + 1}`}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
-
-            <button className="btn btn-primary btn-lg full-w" onClick={()=>setPayModal(true)} disabled={table.items.length===0 || busy}>
-              {busy ? 'Processing…' : 'Generate Bill'}
-            </button>
           </div>
         </div>
       </div>
-
-
-
-      {payModal && <PayModal total={grandTotal} currency={c} onClose={()=>setPayModal(false)} onConfirm={doGen}/>}
-
-      <style>{`
-
-      #root, .fi {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-}
-  
-      body {
-  margin: 0;
-  padding: 0;
-}
-  .billing-layout {height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-    
-.table-strip-res {
-  border-bottom: 1px solid var(--b1);
-  padding: 6px 12px;
-}
-/* Laptop/Desktop */
-@media (min-width: 1024px) {
-  .table-strip-res {
-    padding: 16px 30px;
-  }
-}
-  .tgrid-res {
-  display: flex;
-  flex-wrap: nowrap; /* 🚀 FORCE ONE LINE ON DESKTOP */
-  gap: 6px;
-  padding-top: 6px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.tcard-mini {
-  flex: 1;
-  min-width: 45px;
-  height: 40px;
-  border-radius: 10px;
-
-  background: var(--s2);
-  border: 1px solid var(--b1);
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  position: relative;
-  cursor: pointer;
-}
-
-/* DESKTOP */
-@media (min-width: 1024px) {
-  .tcard-mini {
-    height: 44px;
-    min-width: 50px;
-  }
-}
-
-@media (max-width: 600px) {
-  .tgrid-res {
-    flex-wrap: wrap; 
-  }
-
-  .tcard-mini {
-    flex: 0 0 calc((100% - 5 * 6px) / 6);
-  }
-}
-  @media (max-width: 350px) {
-  .tgrid-res {
-    flex-wrap: wrap; 
-  }
-
-  .tcard-mini {
-    flex: 0 0 calc((100% - 5 * 6px) / 6);
-    height: 35px;
-    min-width: 30px;
-  }
-}
-      @media (min-width: 1024px) {
-        .mname{
-        font-size:12px; font-weight:600; color:var(--t0); line-height:1.3; margin-bottom:2px
-      }
-  }
-
-
-        .tcard-mini.active { border-color: var(--a); background: var(--a); }
-        .tcard-mini.active .tnum-mini { color: #000; }
-        .tnum-mini { font-size: 14px; font-weight: 900; color: var(--t0); }
-        .tstatus-dot { width: 5px; height: 5px; border-radius: 50%; position: absolute; top: 4px; right: 4px; }
-        .tstatus-dot.occupied { background: var(--red); box-shadow: 0 0 5px var(--amber); }
-        .tstatus-dot.free { background: var(--green); }
-
-        .billing-main-grid {display: grid;  grid-template-columns: 1fr clamp(240px, 28vw, 320px); flex: 1; min-height: 0;}
-        
-        /* MENU SIDE */
-        .menu-side { overflow-y: auto; padding: 12px; padding-bottom: 80px; }
-        .filter-bar-sticky { position: sticky; top: -12px; background: var(--bg); z-index: 10; padding: 5px 0 12px; }
-        .search-wrap-mini { display: flex; align-items: center; background: var(--s2); border-radius: 10px; padding: 0 10px; height: 36px; border: 1px solid var(--b1); margin-bottom: 8px; }
-        .search-wrap-mini input { background: none; border: none; outline: none; color: var(--t0); flex: 1; font-size: 13px; margin-left: 8px; }
-        .cat-scroll-mini { display: flex; gap: 5px; overflow-x: auto; scrollbar-width: none; }
-        .cat-pill { padding: 6px 12px; border-radius: 20px; background: var(--s3); color: var(--t2); border: none; font-size: 11px; font-weight: 700; white-space: nowrap; cursor: pointer; }
-        .cat-pill.on { background: var(--a); color: var(--bg); }
-
-        /* IMAGE-FIRST MENU CARDS */
-.items-grid-modern {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-}
-
-/* Mobile */
-@media (max-width: 480px) {
-  .items-grid-modern {
-    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-  }
-}
-
-/* Tablet */
-@media (min-width: 750px) {
-  .items-grid-modern {
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  }
-}
-
-/* Laptop */
-@media (min-width: 1024px) {
-  .items-grid-modern {
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  }
-}
-
-        .mcard-modern { background: var(--s1); border-radius: 16px; overflow: hidden; border: 1px solid var(--b1); display: flex; flex-direction: column; }
-        .mimg-container { position: relative; aspect-ratio: 1/1; width: 100%; background: #000; min-height:130px }
-        .mimg-big { width: 100%; height: 100%; object-fit: cover; }
-        .m-gradient-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 40%); display: flex; align-items: flex-end; padding: 8px; }
-        .m-price-tag { background: var(--a); color: #000; font-size: 12px; font-weight: 900; padding: 2px 8px; border-radius: 6px; }
-        .mname-modern { font-size: 12px; font-weight: 800; padding: 10px 10px 5px; color: var(--t0); height: 38px; overflow: hidden; line-height: 1.2; }
-        .mctrl-modern { display: flex; align-items: center; justify-content: space-between; padding: 5px 10px 12px; }
-        .qbtn-m { width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--b2); background: var(--s2); color: var(--t0); cursor: pointer; font-weight: 900; }
-        @media (min-width: 1024px) {.qbtn-m { width: 28px; height: 28px;}}
-        @media (min-width: 1024px) {.qnum-m {text-align:center; font-size:13px; font-weight:800;}}
-        
-        .main{
-  padding:4px;
-}
-
-/* ================= MAIN LAYOUT FIX ================= */
-.billing-main-grid {
-  display: grid;
-  grid-template-columns: 1fr 320px;
-  flex: 1;
-  min-height: 0; /* IMPORTANT */
-  height: 100%;
-  overflow: hidden; /* 🔥 prevents page expansion */
-}
-
-/* LEFT SIDE (MENU) */
-.menu-side {
-  overflow-y: auto;
-  padding: 12px;
-  padding-bottom: 80px;
-  min-height: 0;
-}
-
-/* ================= BILL PANEL FIX ================= */
-.bill-panel-res {
-  background: var(--s1);
-  border-left: 1px solid var(--b1);
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0; /* 🔥 CRITICAL */
-  overflow: hidden; /* 🔥 prevents growth */
-  position: relative;
-}
-
-/* CONTENT WRAPPER */
-.bill-scroll-content {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0; /* 🔥 CRITICAL */
-  overflow: hidden;
-  padding: 15px;
-}
-
-/* ================= ONLY ITEMS SCROLL AREA ================= */
-.bill-items-scroller {
-  flex: 1;
-  min-height: 0;          /* 🔥 VERY IMPORTANT */
-  overflow-y: auto;       /* ONLY THIS SCROLLS */
-  overflow-x: hidden;
-  padding-right: 4px;
-}
-
-/* ================= MOBILE FIX (KEEP SAME BEHAVIOR) ================= */
-@media (max-width: 750px) {
-  .billing-main-grid {
-    grid-template-columns: 1fr;
-    overflow: hidden;
-  }
-
-  .bill-panel-res {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: 75vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden; /* 🔥 IMPORTANT */
-    border-radius: 20px 20px 0 0;
-    z-index: 100;
-    transition: 0.3s;
-  }
-
-  .bill-panel-res.closed {
-    transform: translateY(calc(100% - 60px));
-  }
-
-  .mobile-handle {
-    display: block;
-    padding: 10px 20px;
-    cursor: pointer;
-    background: var(--s2);
-    border-bottom: 1px solid var(--b1);
-    border-radius: 20px 20px 0 0;
-  }
-}
-
-/* ================= FIX ROW (NO LAYOUT SHIFT) ================= */
-.b-item-row {
-  display: grid;
-  grid-template-columns: 1fr auto 60px;
-  align-items: center;
-  gap: 10px;
-  font-size: 12px;
-  padding: 6px 0;
-}
-
-/* ================= SCROLL CLEAN LOOK ================= */
-.bill-items-scroller::-webkit-scrollbar {
-  width: 4px;
-}
-
-.bill-items-scroller::-webkit-scrollbar-thumb {
-  background: var(--b2);
-  border-radius: 10px;
-}
-
-/* ================= BILL HEADER ================= */
-.bill-header-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 13px;
-  font-weight: 800;
-  margin-bottom: 8px;
-}
-
-.trash-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(239, 68, 68, 0.12); /* light red circle */
-  color: #ef4444;
-
-  border: 1px solid rgba(239, 68, 68, 0.25);
-  cursor: pointer;
-
-  transition: 0.2s ease;
-}
-
-/* hover effect */
-.trash-btn:hover {
-  background: rgba(239, 68, 68, 0.25);
-  transform: scale(1.08);
-  box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
-}
-
-/* ================= INPUTS ================= */
-.mini-input {
-  width: 100%;
-  height: 36px;
-  border-radius: 8px;
-  border: 1px solid var(--b1);
-  background: var(--s2);
-  color: var(--t0);
-  padding: 0 10px;
-  margin-bottom: 6px;
-  font-size: 12px;
-}
-
-/* ================= TABLE STYLE BILL ITEMS ================= */
-.b-item-row {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  align-items: center;
-
-  gap: 10px;
-  padding: 8px 6px;
-
-  border-bottom: 1px solid var(--b1);
-  font-size: 12px;
-}
-
-/* ITEM NAME */
-.b-item-name {
-  font-weight: 700;
-  color: var(--t0);
-
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* QTY CONTROL */
-.b-item-ctrl {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-
-  background: var(--s2);
-  border-radius: 8px;
-  padding: 3px 6px;
-}
-
-.b-item-ctrl button {
-  border: none;
-  font-weight: 900;
-  cursor: pointer;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-}
-
-/* RED (− remove) */
-.b-item-ctrl button:first-child {
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
-}
-
-/* GREEN (+ add) */
-.b-item-ctrl button:last-child {
-  background: rgba(34, 197, 94, 0.15);
-  color: #22c55e;
-}
-
-/* hover effect */
-.b-item-ctrl button:hover {
-  transform: scale(1.1);
-}
-
-.b-item-ctrl span {
-  min-width: 18px;
-  text-align: center;
-  font-weight: 700;
-}
-
-/* PRICE */
-.b-item-price {
-  text-align: right;
-  font-weight: 800;
-  color: var(--a);
-  min-width: 55px;
-}
-
-/* ================= SUMMARY CARD ================= */
-.bill-summary-card {
-  background: var(--s2);
-  border-radius: 12px;
-  padding: 10px;
-  margin: 10px 0;
-  border: 1px solid var(--b1);
-}
-
-.s-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  margin-bottom: 4px;
-}
-
-.total-big {
-  font-size: 16px;
-  font-weight: 900;
-  color: var(--a);
-  border-top: 1px dashed var(--b1);
-  margin-top: 6px;
-  padding-top: 6px;
-}
-
-/* ================= PAYMENT ================= */
-.pm-select-mini {
-  width: 100%;
-  height: 38px;
-  border-radius: 8px;
-  background: var(--s2);
-  border: 1px solid var(--b1);
-  color: var(--t0);
-  margin-bottom: 8px;
-  font-weight: 700;
-  padding: 0 10px;
-}
-
-/* ================= BUTTON ================= */
-.btn-lg {
-  height: 42px;
-  font-size: 13px;
-  font-weight: 800;
-  border-radius: 10px;
-}
-
-/* ================= DESKTOP ================= */
-@media (min-width: 1024px) {
-  .billing-main-grid {
-    grid-template-columns: 1fr clamp(240px, 28vw, 320px);
-  }
-}
-
-/* ================= MOBILE BOTTOM SHEET ================= */
-@media (max-width: 750px) {
-
-  .billing-main-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .bill-panel-res {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-
-    max-height: 75vh;
-
-    border-radius: 18px 18px 0 0;
-    z-index: 100;
-
-    display: flex;
-    flex-direction: column;
-
-    transform: translateY(calc(100% - 60px));
-    transition: transform 0.3s ease;
-  }
-
-  .bill-panel-res.open {
-    transform: translateY(0);
-  }
-
-  .mobile-handle {
-  padding: 10px;
-  background: var(--s2);
-  border-bottom: 1px solid var(--b1);
-  border-radius: 16px 16px 0 0;
-  cursor: pointer;
-  display: flex;
-  justify-content: center;
-}
-
-.h-indicator {
-  width: 35px;
-  height: 4px;
-  background: var(--b2);
-  border-radius: 10px;
-}
-
-  .summary-flex {
-    display: flex;
-    justify-content: space-between;
-    font-size: 13px;
-    font-weight: 700;
-  }
-
-  .summary-total {
-    color: var(--a);
-    font-weight: 900;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-  }
-
-  .rot {
-    transform: rotate(180deg);
-  }
-}
-
-/* ================= CLEAN UI TOUCH ================= */
-.b-item-row:hover {
-  background: rgba(255,255,255,0.03);
-}
-
-/* Hover effect */
-.tcard-mini:hover {
-  transform: translateY(-2px);
-  border-color: var(--a);
-}
-
-/* Active table */
-.tcard-mini.active {
-  background: var(--a);
-  color: #000;
-  box-shadow: 0 0 12px rgba(245, 158, 11, 0.6);
-}
-
-/* Table number */
-.tnum-mini {
-  font-size: 15px;
-  font-weight: 900;
-}
-
-/* Status dot */
-.tstatus-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  position: absolute;
-  top: 6px;
-  right: 6px;
-}
-
-.tstatus-dot.occupied {
-  background: #ef4444;
-  box-shadow: 0 0 6px #ef4444;
-}
-
-.tstatus-dot.free {
-  background: #22c55e;
-  box-shadow: 0 0 6px #22c55e;
-}
-.mhead-pro {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--b2);
-}
-.settle-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 700;
-  color: var(--t0);
-}
-.settle-icon { color: var(--gold); }
-.close-btn-pro {
-  background: none; border: none; color: var(--t2); cursor: pointer;
-  padding: 4px; border-radius: 50%; display: flex; align-items: center;
-}
-.close-btn-pro:hover { background: var(--b2); color: var(--t0); }
-
-.pay-banner-pro {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(217, 119, 6, 0.05));
-  margin: 20px;
-  padding: 20px;
-  border-radius: 12px;
-  text-align: center;
-  border: 1px solid rgba(245, 158, 11, 0.2);
-}
-.pay-banner-label { font-size: 11px; text-transform: uppercase; color: var(--gold); font-weight: 700; letter-spacing: 0.05em; margin-bottom: 4px; }
-.pay-banner-total { font-size: 32px; font-weight: 900; color: var(--t0); font-family: monospace; }
-
-.fgroup-settle { padding: 0 20px 20px; }
-.settle-label { display: block; font-size: 11px; color: var(--t2); margin-bottom: 8px; font-weight: 600; text-transform: uppercase; }
-.input-with-icon {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.input-currency {
-  position: absolute;
-  left: 14px;
-  color: var(--t2);
-  font-weight: 700;
-}
-.fgroup-settle input {
-  width: 100%;
-  background: var(--b2);
-  border: 1px solid var(--b3);
-  border-radius: 10px;
-  padding: 12px 12px 12px 30px;
-  color: var(--t0);
-  font-size: 18px;
-  font-weight: 700;
-  transition: all 0.2s;
-}
-.fgroup-settle input:focus { border-color: var(--gold); outline: none; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15); }
-.settle-hint { font-size: 10px; color: var(--t3); margin-top: 8px; text-align: center; }
-
-.settle-actions {
-  display: flex;
-  gap: 12px;
-  padding: 0 20px 20px;
-}
-.btn-cancel-pro {
-  flex: 1;
-  background: var(--b2);
-  border: 1px solid var(--b3);
-  color: var(--t1);
-  padding: 12px;
-  border-radius: 10px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.btn-confirm-pro {
-  flex: 2;
-  padding: 12px;
-  border-radius: 10px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.btn-confirm-pro.solid { background: var(--gold); color: #000; border: none; }
-.btn-confirm-pro.solid:hover { background: #fbbf24; transform: translateY(-1px); }
-.btn-confirm-pro.ghost { background: none; border: 2px solid var(--gold); color: var(--gold); }
-.btn-confirm-pro.ghost:hover { background: rgba(245, 158, 11, 0.1); }
-
-@keyframes fade-in {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
-}
-.animate-fade-in { animation: fade-in 0.2s ease-out; }
-.sold-out-badge-top {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background: var(--red);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 900;
-  padding: 4px 10px;
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
-  z-index: 10;
-  border: 1px solid rgba(255,255,255,0.2);
-}
-.stock-badge {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-size: 10px;
-  font-weight: 700;
-  color: #fff;
-  background: rgba(0,0,0,0.6);
-  backdrop-filter: blur(4px);
-  border: 1px solid rgba(255,255,255,0.1);
-  z-index: 5;
-}
-`}</style>
     </div>
   );
 }

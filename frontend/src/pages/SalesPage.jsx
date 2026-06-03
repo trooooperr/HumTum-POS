@@ -5,6 +5,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer
 } from 'recharts';
+import { apiUrl, authFetch } from '../lib/api';
 import { TrendingUp, Zap, ArrowRight, CalendarDays } from 'lucide-react';
 
 const WrappedTick = ({ x, y, payload }) => {
@@ -72,54 +73,54 @@ function DateField({ value, onChange, inputRef, label }) {
 }
 
 export default function SalesPage() {
-  const { orderHistory = [], settings } = useApp();
+  const { settings } = useApp();
   const todayStr = new Date().toISOString().slice(0, 10);
-  
-  const [range, setRange] = useState('month'); 
+
+  const [range, setRange] = useState('month');
   const [startDate, setStartDate] = useState(todayStr);
   const [endDate, setEndDate] = useState(todayStr);
   const startInputRef = React.useRef(null);
   const endInputRef = React.useRef(null);
 
-  const filteredOrders = useMemo(() => {
+  const [analytics, setAnalytics] = useState({ revenue: 0, count: 0, dailyData: [], topItems: [] });
+  const [loading, setLoading] = useState(false);
+
+  React.useEffect(() => {
+    let start = startDate;
+    let end = endDate;
     const now = new Date();
-    return orderHistory.filter(o => {
-      if (!o.date) return false;
-      const oDate = new Date(o.date);
-      const oDateStr = o.date.slice(0, 10);
-      if (range === 'custom') return oDateStr >= startDate && oDateStr <= endDate;
-      if (range === 'today') return o.date.startsWith(todayStr);
-      if (range === 'week') {
-        const weekAgo = new Date();
-        weekAgo.setDate(now.getDate() - 7);
-        return oDate >= weekAgo && oDate <= now;
-      }
-      if (range === 'month') return oDate.getMonth() === now.getMonth() && oDate.getFullYear() === now.getFullYear();
-      return true;
-    });
-  }, [orderHistory, range, startDate, endDate, todayStr]);
 
-  const stats = useMemo(() => {
-    const revenue = filteredOrders.reduce((s, o) => s + (o.grandTotal || 0), 0);
-    return { revenue, count: filteredOrders.length };
-  }, [filteredOrders]);
+    if (range === 'today') {
+      start = end = todayStr;
+    } else if (range === 'week') {
+      const weekAgo = new Date();
+      weekAgo.setDate(now.getDate() - 7);
+      start = weekAgo.toISOString().slice(0, 10);
+      end = todayStr;
+    } else if (range === 'month') {
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      start = firstDay.toISOString().slice(0, 10);
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      end = lastDay.toISOString().slice(0, 10);
+    } else if (range === 'all') {
+      start = '2020-01-01';
+      end = '2099-12-31';
+    }
 
-  const dailyData = useMemo(() => {
-    const map = {};
-    filteredOrders.forEach(o => {
-      const d = new Date(o.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
-      map[d] = (map[d] || 0) + (o.grandTotal || 0);
-    });
-    return Object.entries(map).map(([name, sales]) => ({ name, sales }));
-  }, [filteredOrders]);
-
-  const topItems = useMemo(() => {
-    const map = {};
-    filteredOrders.forEach(o => o.items?.forEach(i => {
-      if (i.name) map[i.name] = (map[i.name] || 0) + (i.quantity || 0);
-    }));
-    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, qty]) => ({ name, qty }));
-  }, [filteredOrders]);
+    setLoading(true);
+    authFetch(apiUrl(`/api/reports/analytics?startDate=${start}&endDate=${end}`))
+      .then(res => res.json())
+      .then(data => {
+        if (data.revenue !== undefined) {
+          setAnalytics(data);
+        }
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Failed to fetch analytics:', err);
+        setLoading(false);
+      });
+  }, [range, startDate, endDate, todayStr]);
 
   const handleDateChange = (type, val) => {
     setRange('custom');
@@ -129,37 +130,30 @@ export default function SalesPage() {
 
   return (
     <div className="fi sales-page">
-      <div className="ph sales-header-res">
-        <div className="ph-left">
-          <h1 className="ph-title">Sales Analytics</h1>
-          <p className="ph-sub">Business performance tracking</p>
+      <div className="sales-header-res">
+        <div className="unified-pill-box filter-pills">
+          {['today', 'week', 'month', 'all'].map(f => (
+            <button key={f} className={`f-pill ${range === f ? 'active' : ''}`} onClick={() => setRange(f)}>
+              {f.toUpperCase()}
+            </button>
+          ))}
         </div>
-        
-        <div className="controls-group">
-          <div className="unified-pill-box">
-            {['today', 'week', 'month', 'all'].map(f => (
-              <button key={f} className={`f-pill ${range === f ? 'active' : ''}`} onClick={() => setRange(f)}>
-                {f.toUpperCase()}
-              </button>
-            ))}
-          </div>
 
-           <div className={`unified-pill-box date-box-res ${range === 'custom' ? 'active-border' : ''}`} style={{ gap: 12, paddingLeft: 12, paddingRight: 12 }}>
-             <DateField label="From" value={startDate} onChange={e => handleDateChange('start', e.target.value)} inputRef={startInputRef} />
-             <ArrowRight size={14} style={{ color: 'var(--t2)', flexShrink: 0 }} />
-             <DateField label="To" value={endDate} onChange={e => handleDateChange('end', e.target.value)} inputRef={endInputRef} />
-           </div>
+        <div className={`unified-pill-box date-box-res ${range === 'custom' ? 'active-border' : ''}`} style={{ gap: 12, paddingLeft: 12, paddingRight: 12 }}>
+          <DateField label="From" value={startDate} onChange={e => handleDateChange('start', e.target.value)} inputRef={startInputRef} />
+          <ArrowRight size={14} style={{ color: 'var(--t2)', flexShrink: 0 }} />
+          <DateField label="To" value={endDate} onChange={e => handleDateChange('end', e.target.value)} inputRef={endInputRef} />
         </div>
       </div>
 
       <div className="kpi-row-2">
-        <div className="kpi" style={{'color':'var(--t0)'}}>
+        <div className="kpi" style={{ 'color': 'var(--t0)' }}>
           <div className="kpi-label">Revenue</div>
-          <div className="kpi-value mono">₹{stats.revenue.toLocaleString('en-IN')}</div>
+          <div className="kpi-value mono">{loading ? '...' : `₹${(analytics?.revenue || 0).toLocaleString('en-IN')}`}</div>
         </div>
-        <div className="kpi" style={{'color':'var(--t0)'}}>
+        <div className="kpi" style={{ 'color': 'var(--t0)' }}>
           <div className="kpi-label">Orders</div>
-          <div className="kpi-value mono">{stats.count}</div>
+          <div className="kpi-value mono">{loading ? '...' : (analytics?.count || 0)}</div>
         </div>
       </div>
 
@@ -167,58 +161,52 @@ export default function SalesPage() {
         <div className="card chart-box">
           <div className="chart-info"><Zap size={16} style={{ color: 'var(--a)' }} /><span>Revenue Growth</span></div>
           <ResponsiveContainer width="100%" height={280}>
-            <AreaChart data={dailyData} margin={{ left: -20, right: 0}}>
-              <defs>
-                <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--a)" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="var(--a)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--b1)" />
-              <XAxis dataKey="name" tick={{ fill: 'var(--t1)', fontSize: 10 }} axisLine={{ stroke: 'var(--b2)' }} />
-              <YAxis tick={{ fill: 'var(--t1)', fontSize: 10 }} axisLine={{ stroke: 'var(--b2)' }} />
-              <Tooltip content={<Tip />} cursor={{ stroke: 'var(--a)', strokeWidth: 1 }} />
-              <Area type="monotone" dataKey="sales" name="Sales" stroke="var(--a)" strokeWidth={2.5} fill="url(#areaGrad)" />
-            </AreaChart>
+            {loading ? <div style={{ height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--t2)' }}>Loading...</div> : (
+              <AreaChart data={analytics.dailyData} margin={{ left: -25, right: 10, top: 10, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--a)" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="var(--a)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--b1)" />
+                <XAxis dataKey="name" tick={{ fill: 'var(--t1)', fontSize: 10 }} axisLine={{ stroke: 'var(--b2)' }} />
+                <YAxis tick={{ fill: 'var(--t1)', fontSize: 10 }} axisLine={{ stroke: 'var(--b2)' }} />
+                <Tooltip content={<Tip />} cursor={{ stroke: 'var(--a)', strokeWidth: 1 }} />
+                <Area type="monotone" dataKey="sales" name="Sales" stroke="var(--a)" strokeWidth={2.5} fill="url(#areaGrad)" />
+              </AreaChart>
+            )}
           </ResponsiveContainer>
         </div>
 
         <div className="card chart-box">
           <div className="chart-info"><TrendingUp size={16} style={{ color: 'var(--blue)' }} /><span>Top Items Sold</span></div>
           <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={topItems} layout="vertical" margin={{ left: -22, right: 0 }}>
-              <XAxis type="number" axisLine={{ stroke: 'var(--b2)' }} tick={{ fill: 'var(--t1)', fontSize: 10 }} />
-              <YAxis dataKey="name" type="category" width={95} tick={<WrappedTick />} axisLine={{ stroke: 'var(--b2)' }} />
-              <Tooltip content={<Tip />} cursor={{ fill: 'var(--s2)', opacity: 0.4 }} />
-              {/* Changed color to var(--blue) */}
-              <Bar dataKey="qty" name="Qty" radius={[0, 4, 4, 0]} barSize={18} fill="var(--blue)" />
-            </BarChart>
+            {loading ? <div style={{ height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--t2)' }}>Loading...</div> : (
+              <BarChart data={analytics.topItems} layout="vertical" margin={{ left: -35, right: 10, top: 10, bottom: 0 }}>
+                <XAxis type="number" axisLine={{ stroke: 'var(--b2)' }} tick={{ fill: 'var(--t1)', fontSize: 10 }} />
+                <YAxis dataKey="name" type="category" width={95} tick={<WrappedTick />} axisLine={{ stroke: 'var(--b2)' }} />
+                <Tooltip content={<Tip />} cursor={{ fill: 'var(--s2)', opacity: 0.4 }} />
+                {/* Changed color to var(--blue) */}
+                <Bar dataKey="qty" name="Qty" radius={[0, 4, 4, 0]} barSize={18} fill="var(--blue)" />
+              </BarChart>
+            )}
           </ResponsiveContainer>
         </div>
       </div>
 
       <style>{`
         .sales-page { display: flex; flex-direction: column; gap: 20px; }
-        
         .sales-header-res { 
           display: flex; 
-          justify-content: space-between; 
           align-items: center; 
           flex-wrap: wrap; 
-          gap: 20px; 
+          gap: 12px; 
           width: 100%;
+          justify-content: flex-end; /* Aligns items to right on desktop */
         }
 
         .ph-left { text-align: left; }
-
-        .controls-group { 
-          display: flex; 
-          align-items: center; 
-          justify-content: flex-end; 
-          gap: 12px; 
-          flex-grow: 1; /* Allows it to take up remaining space */
-        }
-        
         .unified-pill-box { 
           display: flex; 
           align-items: center; 
@@ -294,26 +282,62 @@ export default function SalesPage() {
 
         .kpi-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         .charts-equal-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .chart-box { padding: 24px; background: var(--s1); border: 1px solid var(--b1); border-radius: var(--rl); }
+        .chart-box { padding: 24px; background: var(--s1); border: 1px solid var(--b1); border-radius: var(--rl); min-width: 0; overflow: hidden; }
         .chart-info { display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--t0); margin-bottom: 20px; }
 
         .chart-tip { background: var(--s2); border: 1px solid var(--b2); padding: 12px; border-radius: 10px; }
 
         @media (max-width: 750px) { 
-          .controls-group { 
-            flex-direction: column; 
-            width: 100%; 
+          .sales-header-res {
+            flex-direction: column;
             align-items: stretch;
+            justify-content: center;
+            gap: 16px;
           }
-          .unified-pill-box { 
+          .filter-pills {
             width: 100%; 
             justify-content: space-between; 
+            flex-wrap: wrap;
+            gap: 8px;
+            height: auto;
+            padding: 8px;
           }
-          .date-box-res { justify-content: center; gap: 10px; flex-wrap: wrap; height: auto; padding: 10px; }
+          .f-pill {
+            flex: 1;
+            text-align: center;
+          }
+          .date-box-res { 
+            flex-direction: row;
+            align-items: center;
+            gap: 8px; 
+            height: auto; 
+            padding: 8px; 
+            width: 100%;
+          }
+          .sales-date-field {
+            flex: 1;
+            justify-content: center;
+          }
+          .sales-date-input-wrapper {
+            flex: 1;
+            max-width: none;
+            min-width: 0;
+            padding: 0 4px;
+          }
+          .sales-date-label { display: none; }
+          .chart-box {
+            padding: 16px;
+          }
         }
 
         @media (max-width: 1024px) { 
-          .charts-equal-row, .kpi-row-2 { grid-template-columns: 1fr; } 
+          .charts-equal-row { grid-template-columns: 1fr; } 
+        }
+        
+        @media (max-width: 480px) {
+          .kpi-row-2 { grid-template-columns: 1fr 1fr; gap: 8px; }
+          .kpi-row-2 .kpi-label { font-size: 10px; }
+          .kpi-row-2 .kpi-value { font-size: 18px; }
         }
       `}</style>
     </div>

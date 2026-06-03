@@ -1,0 +1,201 @@
+/* KitchenDisplay.css */
+/* Root variables are expected from global theme (e.g., --bg, --s1, --s2, --a, --t0, --t1, --t2, --b1, --b2) */
+
+.kitchen-display {
+  padding: 24px;
+  background: var(--bg);
+  min-height: 100vh;
+  color: var(--t1);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.kitchen-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.kitchen-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.kitchen-title {
+  font-size: 26px;
+  font-weight: 900;
+  margin: 0;
+  color: var(--t0);
+}
+
+.kitchen-subtitle {
+  font-size: 12px;
+  color: var(--t2);
+  margin: 4px 0 0;
+}
+
+.refresh-button {
+  padding: 8px 14px;
+  background: var(--s2);
+  color: var(--t1);
+  border: 1px solid var(--b2);
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+.refresh-button:hover {
+  background: var(--s1);
+  transform: translateY(-1px);
+}
+
+/* spinning animation for refresh icon */
+.refresh-button svg.rotating {
+  animation: kd-spin 0.9s linear infinite;
+  transform-origin: 50% 50%;
+}
+
+@keyframes kd-spin {
+  to { transform: rotate(360deg); }
+}
+
+.kitchen-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  padding-bottom: 32px;
+  align-items: flex-start;
+}
+
+.kitchen-table-column {
+  background: var(--s1);
+  border-radius: 12px;
+  border: 1px solid var(--b2);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 180px);
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+
+.kitchen-table-header {
+  padding: 12px 16px;
+  background: var(--s2);
+  border-bottom: 1px solid var(--b2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.kitchen-table-header span:first-child {
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--a);
+}
+
+.count-badge {
+  font-size: 11px;
+  background: var(--a);
+  color: var(--s0);
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-weight: 700;
+}
+
+.kitchen-kot-list {
+  padding: 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  padding-bottom: 20px;
+}
+
+/* Custom scrollbar */
+.custom-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.custom-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scroll::-webkit-scrollbar-thumb {
+  background-color: var(--b2);
+  border-radius: 4px;
+}
+
+.kot-card {
+  background: var(--s2);
+  border: 1px solid var(--b2);
+  border-radius: 10px;
+  padding: 14px;
+  color: var(--t1);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: transform 0.1s ease, box-shadow 0.2s ease;
+}
+.kot-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+/* New UI components */
+.top-stats-bar {
+  display: flex;
+  gap: 16px;
+  padding: 12px 24px;
+  background: var(--b1);
+  border-radius: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  color: var(--t0);
+}
+.stat-item {
+  font-weight: 600;
+  color: var(--t0);
+}
+.tables-section {
+  margin-top: 24px;
+}
+.section-title {
+  font-size: 1.2rem;
+  margin-bottom: 8px;
+  color: var(--s1);
+  text-align: center;
+}
+.tables-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+}
+.kitchen-table-card {
+  background: var(--s1);
+  border-radius: 12px;
+  border: 1px solid var(--b2);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  cursor: pointer;
+}
+
+
+@media (max-width: 600px) {
+  .kitchen-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .kitchen-grid {
+    grid-template-columns: 1fr;
+  }
+  .kitchen-table-column {
+    max-height: none;
+  }
+}

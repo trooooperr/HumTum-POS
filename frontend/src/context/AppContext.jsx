@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
 import { apiUrl, authFetch } from '../lib/api';
+import io from 'socket.io-client';
 
 const AppContext = createContext(null);
 const TABLES_KEY = 'humtum_table_bills_v2';
@@ -13,19 +14,19 @@ export const ROLE_HIERARCHY = {
     label: 'Admin',
     level: 3,
     color: '#FF8C00',
-    permissions: ['billing','menu','orders','sales','workers','inventory','settings']
+    permissions: ['billing','menu','orders','sales','workers','inventory','settings','kitchen']
   },
   manager: {
     label: 'Manager',
     level: 2,
-    color: '#3B82F6',
-    permissions: ['billing','menu','orders','sales','inventory','settings']
+    color: '#B8860B',
+    permissions: ['billing','menu','orders','sales','inventory','settings','kitchen']
   },
   staff: {
     label: 'Staff',
     level: 1,
     color: '#22C55E',
-    permissions: ['billing','orders','inventory']
+    permissions: ['billing','orders','inventory','kitchen']
   },
 };
 
@@ -34,7 +35,7 @@ const SETTINGS_CACHE = 'ht_settings_cache';
 const WORKERS_CACHE = 'ht_workers_cache';
 const INVENTORY_CACHE = 'ht_inventory_cache';
 
-const NUM_TABLES = 12;
+const NUM_TABLES = 21;
 
 const DEFAULT_SETTINGS = {
   restaurantName:  'HumTum Bar & Restaurant',
@@ -91,6 +92,57 @@ export function AppProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(() => {
     try { return JSON.parse(localStorage.getItem(AUTH_KEY)); } catch { return null; }
   });
+
+  // ── Socket.IO ────────────────────────────────────────────────────
+  const [socket, setSocket] = useState(null);
+  
+  useEffect(() => {
+    if (!currentUser) {
+      if (socket) socket.disconnect();
+      setSocket(null);
+      return;
+    }
+
+    const newSocket = io(window.location.origin, {
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5,
+      auth: {
+        token: localStorage.getItem(TOKEN_KEY),
+      }
+    });
+
+    newSocket.on('connect', () => {
+      console.log('✅ Socket.IO connected');
+    });
+
+    newSocket.on('disconnect', () => {
+      console.log('❌ Socket.IO disconnected');
+    });
+
+    newSocket.on('INVENTORY_UPDATED', (data) => {
+      if (data && data.inventory) {
+        setInventory(data.inventory);
+        setMenuItems(prev => prev.map(item => {
+          const match = data.inventory.find(inv => inv.name?.toLowerCase().trim() === item.name?.toLowerCase().trim());
+          return match ? { ...item, available: match.stock > 0 } : item;
+        }));
+        localStorage.setItem(INVENTORY_CACHE, JSON.stringify(data.inventory));
+      }
+    });
+
+    setSocket(newSocket);
+
+    return () => {
+      if (newSocket) newSocket.disconnect();
+    };
+  }, [currentUser]);
+
+  // ── KOT & Table Session State ───────────────────────────────────
+  const [kotSessions, setKotSessions] = useState({}); // { tableNo: { kots: [], status, etc } }
+  const [currentSession, setCurrentSession] = useState(null); // { tableNo, orderId, activeKots, etc }
+  const [kots, setKots] = useState([]);
 
   // ── Settings ────────────────────────────────────────────────────
   const [settings, _setSettings] = useState(() => {
@@ -174,6 +226,16 @@ export function AppProvider({ children }) {
   const [loading,      setLoading]      = useState(true);
   const [error,        setError]        = useState(null);
 
+  const applyInventoryUpdate = useCallback((nextInventory) => {
+    if (!Array.isArray(nextInventory)) return;
+    setInventory(nextInventory);
+    setMenuItems(prev => prev.map(item => {
+      const match = nextInventory.find(inv => inv.name?.toLowerCase().trim() === item.name?.toLowerCase().trim());
+      return match ? { ...item, available: match.stock > 0 } : item;
+    }));
+    localStorage.setItem(INVENTORY_CACHE, JSON.stringify(nextInventory));
+  }, []);
+
   // ── Tables — persist to localStorage ────────────────────────────
   const [tableBills, _setTableBills] = useState(loadTableBills);
   const setTableBills = useCallback((updater) => {
@@ -184,7 +246,7 @@ export function AppProvider({ children }) {
     });
   }, []);
 
-  const [activeTableId,   setActiveTableId]   = useState('T1');
+  const [activeTableId,   setActiveTableId]   = useState(null);
   const [categoryFilter,  setCategoryFilter]  = useState('All');
   const [menuSearch,      setMenuSearch]      = useState('');
   const [invoiceOrder,    setInvoiceOrder]    = useState(null);
@@ -350,7 +412,8 @@ export function AppProvider({ children }) {
   const filteredMenu = useMemo(() => {
     return allSellableItems.filter(item => {
       const mc = categoryFilter === 'All' || item.category === categoryFilter;
-      const ms = item.name.toLowerCase().includes(menuSearch.toLowerCase());
+      const query = menuSearch.toLowerCase();
+      const ms = item.name.toLowerCase().includes(query) || (item.shortcut || '').toLowerCase().includes(query);
       return mc && ms;
     });
   }, [allSellableItems, categoryFilter, menuSearch]);
@@ -398,6 +461,19 @@ export function AppProvider({ children }) {
       ...prev,
       [tableId]: { items:[], discount:'', customerPhone:'', customerName:'', startTime:null, dueAmount:0 }
     }));
+  }, [setTableBills]);
+
+  const setItemNote = useCallback((tableId, itemId, note) => {
+    if (!tableId) return;
+    setTableBills(prev => {
+      const current = prev[tableId] || { items: [] };
+      const tableItems = [...current.items];
+      const idx = tableItems.findIndex(i => String(i._id) === String(itemId));
+      if (idx >= 0) {
+        tableItems[idx] = { ...tableItems[idx], note };
+      }
+      return { ...prev, [tableId]: { ...current, items: tableItems } };
+    });
   }, [setTableBills]);
 
   const setTableField = useCallback((tableId, field, val) => {
@@ -463,7 +539,9 @@ export function AppProvider({ children }) {
         throw new Error(errData.message || `Server error (${res.status})`);
       }
 
-      const saved = await res.json();
+      const savedResponse = await res.json();
+      const { inventory: nextInventory, ...saved } = savedResponse;
+      if (nextInventory) applyInventoryUpdate(nextInventory);
       setOrderHistory(prev => [saved, ...(Array.isArray(prev)?prev:[])]);
       setInvoiceOrder(saved);
       // ← Table cleared ONLY here, after successful DB save
@@ -474,7 +552,7 @@ export function AppProvider({ children }) {
       console.error('Generate bill error:', err);
       return { error: err.message || 'Failed to generate bill' };
     }
-  }, [tableBills, activeTableId, orderHistory, billTotals, clearTable, setTableField]);
+  }, [tableBills, activeTableId, orderHistory, billTotals, clearTable, setTableField, applyInventoryUpdate]);
 
   // ── Menu CRUD ────────────────────────────────────────────────────
   const saveMenuItem = useCallback(async (data, id) => {
@@ -549,46 +627,147 @@ export function AppProvider({ children }) {
     setInventory(prev => prev.filter(i=>i._id!==id));
   }, []);
 
-  const settleOrder = useCallback(async (orderId, paidAmount, paymentMode) => {
+  // settleOrder removed — payments consolidated in finalizeBill/generateBill flows
+
+  // ── KOT Functions ───────────────────────────────────────────────
+  const openTableSession = useCallback(async (tableNo, waiterName = '', orderType = 'dine-in') => {
     try {
-      const res = await authFetch(apiUrl(`/api/orders/${orderId}/settle`), {
-        method:'PATCH',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ paidAmount, paymentMode })
+      const res = await authFetch(apiUrl(`/api/orders/table/${tableNo}/open`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ waiterName, orderType })
       });
-      if (!res.ok) throw new Error('Failed to settle order');
-      const saved = await res.json();
-      setOrderHistory(prev => prev.map(o => o._id === orderId ? saved : o));
-      return saved;
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to open table');
+      }
+      const session = await res.json();
+      setCurrentSession(session);
+      if (socket) socket.emit('join-table', tableNo);
+      return session;
     } catch (err) {
-      console.error('Settle order error:', err);
+      console.error('Open table error:', err);
       throw err;
     }
+  }, [socket]);
+
+  const syncTableSession = useCallback(async (tableNo, pendingItems, totalAmount, waiterName = '', orderType = 'dine-in') => {
+    try {
+      const res = await authFetch(apiUrl(`/api/orders/table/${tableNo}/session`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pendingItems, totalAmount, waiterName, orderType })
+      });
+      if (!res.ok) throw new Error('Failed to sync session');
+      const session = await res.json();
+      setCurrentSession(session);
+      return session;
+    } catch (err) {
+      console.error('Sync session error:', err);
+    }
   }, []);
+
+  const createKOT = useCallback(async (orderId, tableNo, items, notes = '', waiterName = '', orderType = 'dine-in') => {
+    try {
+      const res = await authFetch(apiUrl('/api/kots'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, tableNo, items, notes, waiterName, orderType })
+      });
+      if (!res.ok) throw new Error('Failed to create KOT');
+      const kotResponse = await res.json();
+      const { inventory: nextInventory, ...kot } = kotResponse;
+      if (nextInventory) applyInventoryUpdate(nextInventory);
+      setKots(prev => [kot, ...prev]);
+      if (socket) socket.emit('kot-created', kot);
+      return kot;
+    } catch (err) {
+      console.error('Create KOT error:', err);
+      throw err;
+    }
+  }, [socket, applyInventoryUpdate]);
+
+  const updateKOTStatus = useCallback(async (kotId, status) => {
+    try {
+      const res = await authFetch(apiUrl(`/api/kots/${kotId}/status`), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      if (!res.ok) throw new Error('Failed to update KOT');
+      const updated = await res.json();
+      setKots(prev => prev.map(k => k._id === kotId ? updated : k));
+      if (socket) socket.emit('kot-status-updated', updated);
+      return updated;
+    } catch (err) {
+      console.error('Update KOT error:', err);
+      throw err;
+    }
+  }, [socket]);
+
+  const finalizeBill = useCallback(async (orderId, items, subtotal, sgst, cgst, discount, roundOff, grandTotal, waiterName = '', orderType = 'dine-in', customerName = '', customerPhone = '') => {
+    try {
+      const res = await authFetch(apiUrl(`/api/orders/${orderId}/finalize-bill`), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items, subtotal, sgst, cgst, discount, roundOff, grandTotal, waiterName, orderType, customerName, customerPhone })
+      });
+      if (!res.ok) throw new Error('Failed to finalize bill');
+      const orderResponse = await res.json();
+      const { inventory: nextInventory, ...order } = orderResponse;
+      if (nextInventory) applyInventoryUpdate(nextInventory);
+      setOrderHistory(prev => prev.map(o => o._id === orderId ? order : o));
+      return order;
+    } catch (err) {
+      console.error('Finalize bill error:', err);
+      throw err;
+    }
+  }, [applyInventoryUpdate]);
+
+  const completeOrder = useCallback(async (orderId) => {
+    try {
+      const res = await authFetch(apiUrl(`/api/orders/${orderId}/complete`), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!res.ok) throw new Error('Failed to complete order');
+      const order = await res.json();
+      setOrderHistory(prev => prev.map(o => o._id === orderId ? order : o));
+      if (socket && order.tableNo) socket.emit('order-completed', { tableNo: order.tableNo, orderId });
+      return order;
+    } catch (err) {
+      console.error('Complete order error:', err);
+      throw err;
+    }
+  }, [socket]);
 
   return (
     <AppContext.Provider value={{
       currentUser, login, logout,
       forgotPassword, resetPassword,
       role, can, canAccessRole, ROLE_HIERARCHY,
-      settings, saveSettings,
+      settings, setSettings, saveSettings,
       activeSection, setActiveSection,
       sidebarOpen, setSidebarOpen,
       menuItems, orderHistory, workers,
       inventory, setInventory,
       saveInventoryItem, deleteInventoryItem,
       loading, error, loadData,
-      tableBills, activeTableId, selectTable,
-      updateTableItem, clearTable, setTableField,
+      tableBills, setTableBills, activeTableId, selectTable,
+      updateTableItem, clearTable, setTableField, setItemNote,
       allSellableItems, billTotals, filteredMenu, categories,
       categoryFilter, setCategoryFilter,
       menuSearch, setMenuSearch,
-      getTableStatus, generateBill, settleOrder,
+      getTableStatus, generateBill,
       invoiceOrder, setInvoiceOrder,
       saveMenuItem, deleteMenuItem,
       saveWorker, deleteWorker, updateWorkerStatus,
       toast, showToast,
       NUM_TABLES,
+      // Socket.IO & KOT functions
+      socket,
+      kotSessions, currentSession, kots,
+      openTableSession, syncTableSession, createKOT, updateKOTStatus, finalizeBill, completeOrder,
     }}>
       {children}
     </AppContext.Provider>

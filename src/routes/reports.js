@@ -5,6 +5,7 @@ const Inventory = require('../models/Inventory');
 const Settings = require('../models/Settings');
 const nodemailer = require('nodemailer');
 const { getCache, setCache } = require('../lib/redis');
+const { requireRole } = require('../middleware/auth');
 
 const REPORT_SUMMARY_CACHE_KEY = 'reports:daily-summary';
 
@@ -31,10 +32,22 @@ function resolveEmailConfig(persisted, incoming = {}) {
 
   return {
     authEmail,
-    senderEmail: incoming.senderEmail || persisted?.senderEmail || authEmail,
+    senderEmail: process.env.GMAIL_SENDER || incoming.senderEmail || persisted?.senderEmail || authEmail,
     senderPassword: incoming.senderPassword || persisted?.senderPassword || process.env.GMAIL_APP_PASSWORD || '',
     adminEmail: incoming.adminEmail || persisted?.adminEmail || process.env.ADMIN_EMAIL || '',
   };
+}
+
+function assertEmailConfig(emailConfig) {
+  if (!emailConfig.authEmail) {
+    throw new Error('Missing sender email. Set GMAIL_SENDER in .env.');
+  }
+  if (!emailConfig.senderPassword) {
+    throw new Error('Missing Gmail app password. Set GMAIL_APP_PASSWORD in .env.');
+  }
+  if (!emailConfig.adminEmail) {
+    throw new Error('Missing recipient email. Set ADMIN_EMAIL in .env or Settings.');
+  }
 }
 
 function createTransport(emailConfig) {
@@ -156,6 +169,7 @@ function buildReportHTML({ date, orders, settings, inventory }) {
 async function sendDailyReportInternal(options = {}) {
   const persistedSettings = await getPersistedSettings();
   const resolvedEmailConfig = resolveEmailConfig(persistedSettings, options.emailConfig);
+  assertEmailConfig(resolvedEmailConfig);
   const resolvedSettings = {
     ...persistedSettings.toObject(),
     ...options.settings,
@@ -171,27 +185,38 @@ async function sendDailyReportInternal(options = {}) {
   const transporter = createTransport(resolvedEmailConfig);
   await transporter.verify();
 
-  return await transporter.sendMail({
+  const result = await transporter.sendMail({
     from:    `"${resolvedSettings.restaurantName || 'HumTum POS'}" <${resolvedEmailConfig.senderEmail}>`,
     replyTo: resolvedEmailConfig.senderEmail,
-    to:      'shubhampriy11@gmail.com', // Force all reports to admin
+    to:      resolvedEmailConfig.adminEmail,
     subject: `📊 Daily Report — ${resolvedSettings.restaurantName || 'HumTum'} — ${new Date().toLocaleDateString('en-IN')}`,
     html,
   });
+
+  return {
+    ...result,
+    recipient: resolvedEmailConfig.adminEmail,
+    ordersCount: orders.length,
+  };
 }
 
-router.post('/send-daily', async (req, res) => {
+router.post('/send-daily', requireRole(['admin', 'manager']), async (req, res) => {
   try {
     const { emailConfig, settings } = req.body;
     const result = await sendDailyReportInternal({ emailConfig, settings });
-    res.json({ success:true, message:'Report sent' });
+    res.json({
+      success:true,
+      message:'Report sent',
+      recipient: result.recipient,
+      ordersCount: result.ordersCount,
+    });
   } catch (err) {
     console.error('Email error:', err.message);
     res.status(500).json({ error: err.message || 'Failed to send email.' });
   }
 });
 
-router.get('/daily-summary', async (req, res) => {
+router.get('/daily-summary', requireRole(['admin', 'manager']), async (req, res) => {
   try {
     const cached = await getCache(REPORT_SUMMARY_CACHE_KEY);
     if (cached) return res.json(cached);
@@ -205,6 +230,64 @@ router.get('/daily-summary', async (req, res) => {
     const summary = { ordersCount:orders.length, revenue:total, due, paymentBreakdown:pmMap, date:start };
     await setCache(REPORT_SUMMARY_CACHE_KEY, summary, 120);
     res.json(summary);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/analytics', requireRole(['admin', 'manager']), async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    if (!startDate || !endDate) return res.status(400).json({ message: 'startDate and endDate required' });
+    
+    const start = new Date(startDate);
+    start.setHours(0,0,0,0);
+    const end = new Date(endDate);
+    end.setHours(23,59,59,999);
+
+    const match = { date: { $gte: start, $lte: end } };
+
+    // 1. Basic Stats
+    const statsResult = await Order.aggregate([
+      { $match: match },
+      { $group: { _id: null, revenue: { $sum: "$grandTotal" }, count: { $sum: 1 } } }
+    ]);
+    const stats = statsResult[0] || { revenue: 0, count: 0 };
+
+    // 2. Daily Data
+    const dailyResult = await Order.aggregate([
+      { $match: match },
+      { $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$date", timezone: "Asia/Kolkata" } },
+          sales: { $sum: "$grandTotal" }
+      }},
+      { $sort: { _id: 1 } }
+    ]);
+    
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const dailyData = dailyResult.map(d => {
+      const dateParts = d._id.split('-');
+      const day = dateParts[2];
+      const month = months[parseInt(dateParts[1], 10) - 1];
+      return { name: `${day} ${month}`, sales: d.sales };
+    });
+
+    // 3. Top Items
+    const topItemsResult = await Order.aggregate([
+      { $match: match },
+      { $unwind: "$items" },
+      { $group: { _id: "$items.name", qty: { $sum: "$items.quantity" } } },
+      { $sort: { qty: -1 } },
+      { $limit: 10 }
+    ]);
+    const topItems = topItemsResult.map(item => ({ name: item._id, qty: item.qty }));
+
+    res.json({
+      revenue: stats.revenue || 0,
+      count: stats.count || 0,
+      dailyData,
+      topItems
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

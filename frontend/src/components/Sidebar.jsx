@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp, ROLE_HIERARCHY } from '../context/AppContext';
-import { LayoutDashboard, UtensilsCrossed, ClipboardList, BarChart3, Users, Package, Settings, Sun, Moon, LogOut, X } from 'lucide-react';
+import { LayoutDashboard, UtensilsCrossed, ClipboardList, BarChart3, Users, Package, Settings, Sun, Moon, LogOut, X, Menu } from 'lucide-react';
 
 const NAV = [
   { id:'billing',   label:'Billing',         icon:LayoutDashboard, perm:'billing'   },
@@ -10,28 +10,38 @@ const NAV = [
   { id:'workers',   label:'Staff',           icon:Users,           perm:'workers'   },
   { id:'inventory', label:'Inventory',       icon:Package,         perm:'inventory' },
   { id:'settings',  label:'Settings',        icon:Settings,        perm:'settings'  },
+  { id:'kitchen',   label:'Kitchen Display', icon:UtensilsCrossed, perm:'kitchen'   },
 ];
 
-const RC = { admin:'#F59E0B', manager:'#3B82F6', staff:'#10B981' };
+const RC = { admin:'#0D9488', manager:'#B8860B', staff:'#10B981' };
 
 export default function Sidebar() {
   const { activeSection, setActiveSection, can, role, currentUser, logout, settings, saveSettings, sidebarOpen, setSidebarOpen } = useApp();
-  const rc = RC[role] || '#F59E0B';
+  const rc = RC[role] || '#0D9488';
   const go = id => { setActiveSection(id); setSidebarOpen(false); };
 
   return (
     <>
-      {sidebarOpen && <div onClick={()=>setSidebarOpen(false)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:1999 }}/>}
+      {/* Overlay Backdrop */}
+      {sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          className="sidebar-overlay"
+        />
+      )}
 
-      <aside className={`sbar${sidebarOpen?' open':''}`}>
+      {/* Sidebar */}
+      <aside className={`sbar${sidebarOpen ? ' open' : ''}`}>
         {/* Logo */}
         <div className="logo-wrap">
-          <div className="logo-box">HT</div>
+          <div className="logo-box">H</div>
           <div style={{ flex:1 }}>
-            <div className="logo-name" style={{ fontFamily:'Pacifico,cursive', color:'var(--a)' }}>
-              {settings.restaurantName?.split(' ').slice(0,2).join(' ') || 'HumTum'}
+            <div className="logo-name" style={{ fontWeight: 900, letterSpacing: '-0.08em', color: 'var(--a)', fontSize: 18, textTransform: 'uppercase', textShadow: '0 1px 2px rgba(0,0,0,0.18)' }}>
+              {settings.restaurantName?.toUpperCase() || 'HUMTUM'}
             </div>
-            <div className="logo-sub">Bar & Restaurant</div>
+            <div className="logo-sub" style={{ color: 'var(--t2)', fontSize: 11, letterSpacing: '0.02em' }}>
+              The BAR & Restaurant
+            </div>
           </div>
           <button className="iBtn" style={{ padding:4 }} onClick={()=>setSidebarOpen(false)}><X size={12}/></button>
         </div>
@@ -65,9 +75,9 @@ export default function Sidebar() {
             {settings.darkMode ? <Moon size={12}/> : <Sun size={12}/>}
             {settings.darkMode ? 'Dark' : 'Light'} Mode
           </span>
-          <label className="tog">
+          <label className="switch">
             <input type="checkbox" checked={!!settings.darkMode} onChange={e=>saveSettings({darkMode:e.target.checked})}/>
-            <span className="tslider"/>
+            <span className="slider"/>
           </label>
         </div>
 

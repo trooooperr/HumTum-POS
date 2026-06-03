@@ -81,7 +81,7 @@ export default function LoginPage() {
                   marginBottom: 20, 
                   textAlign: 'center' 
                 }}>
-                  <ShieldCheck size={24} style={{ color: 'var(--amber)', marginBottom: 8 }}/>
+                  <ShieldCheck size={24} style={{ color: 'var(--a)', marginBottom: 8 }}/>
                   <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--t0)', marginBottom: 4 }}>
                     Admin Authorization
                   </div>
@@ -98,7 +98,7 @@ export default function LoginPage() {
                     onClick={() => { setFpEmail('admin_account'); setFpError(''); }}
                   >
                     <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-                      <div style={{ width:32, height:32, borderRadius:8, background:'rgba(245,158,11,0.1)', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--amber)' }}>
+                      <div style={{ width:32, height:32, borderRadius:8, background:'rgba(245,158,11,0.1)', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--a)' }}>
                         <Lock size={18}/>
                       </div>
                       <div style={{ textAlign:'left' }}>
@@ -218,17 +218,6 @@ export default function LoginPage() {
             </button>
           )}
         </div>
-      <style>{`
-.lpage{ min-height:100dvh; display:flex; align-items:center; justify-content:center; padding:16px; }
-.lcard{ width:100%; max-width:420px; padding:22px; border-radius:14px; position:relative; }
-@media (max-width: 480px){
-  .lpage{ padding:8px; align-items:flex-start; margin-top:10px; }
-  .ltitle{ font-size:18px; }
-  .lsub{ font-size:11px; }
-  .fgroup input{ font-size:13px; padding:8px 10px; }
-  .lcard button{ font-size:12px; }
-}
-`}</style>
       </div>
     );
   }
@@ -286,54 +275,6 @@ export default function LoginPage() {
           © {new Date().getFullYear()} {settings.restaurantName}
         </p>
       </div>
-    <style>{`
-/* PAGE WRAPPER */
-.lpage{
-  min-height:100dvh;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:16px;
-}
-
-/* CARD */
-.lcard{
-  width:100%;
-  max-width:420px;
-  padding:22px;
-  border-radius:14px;
-}
-
-/* MOBILE FIX */
-@media (max-width: 480px){
-
-  .lpage{
-    padding:8px;
-    align-items:flex-start;
-    margin-top:10px;
-  }
-
-
-  .ltitle{
-    font-size:18px;
-  }
-
-  .lsub{
-    font-size:11px;
-  }
-
-  .fgroup input{
-    font-size:13px;
-    padding:8px 10px;
-  }
-
-  .lcard button{
-    font-size:12px;
-  }
-}
-  
-`}</style>
     </div>
-
   );
 }
