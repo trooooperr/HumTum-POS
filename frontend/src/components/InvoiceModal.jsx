@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { X, Printer, Phone, Send, Check, Download, Share2 } from 'lucide-react';
+import { apiUrl, authFetch } from '../lib/api';
 
 export default function InvoiceModal() {
   const { invoiceOrder, setInvoiceOrder, settings, showToast } = useApp();
@@ -113,12 +114,8 @@ export default function InvoiceModal() {
     `;
 
     try {
-      const response = await fetch('/api/print', {
+      const response = await authFetch(apiUrl('/api/print'), {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('humtum_token_v2')}`
-        },
         body: JSON.stringify({ html, documentType: 'bill' })
       });
       if (response.ok) {
@@ -129,8 +126,36 @@ export default function InvoiceModal() {
       const errData = await response.json().catch(() => ({}));
       throw new Error(errData.error || 'Server print failure');
     } catch (err) {
-      console.warn('Direct backend print failed:', err);
-      showToast(`Print failed: ${err.message || 'Direct printing error'}`, 'error');
+      console.warn('Direct backend print failed, falling back to browser print:', err);
+      
+      // Fallback: Browser Print Dialog
+      try {
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+        
+        const doc = iframe.contentDocument || iframe.contentWindow.document;
+        doc.open();
+        doc.write(html);
+        doc.close();
+        
+        // Wait for images / assets to load and print
+        setTimeout(() => {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+          document.body.removeChild(iframe);
+        }, 500);
+        
+        showToast('Backend print failed. Fallback: browser print dialog opened.', 'info');
+      } catch (printErr) {
+        console.error('Browser print fallback failed:', printErr);
+        showToast(`Print failed: ${err.message || 'Direct printing error'}`, 'error');
+      }
     }
   };
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { ArrowLeft, Search, Trash2, Printer, UtensilsCrossed, X, Menu } from 'lucide-react';
+import { apiUrl, authFetch } from '../lib/api';
 const PM = ['cash', 'card', 'upi'];
 
 /* COMPACT TABLE PILL */
@@ -286,11 +287,7 @@ export default function BillingPage() {
     const tableNo = parseInt(targetTableId.substring(1));
 
     try {
-      const response = await fetch(`/api/orders/table/${tableNo}/session`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('humtum_token_v2')}`
-        }
-      });
+      const response = await authFetch(apiUrl(`/api/orders/table/${tableNo}/session`));
 
       let session;
       if (response.ok) {
@@ -321,16 +318,23 @@ export default function BillingPage() {
       }));
 
       // Update local storage/state table bills
-      setTableBills(prev => ({
-        ...prev,
-        [targetTableId]: {
-          ...prev[targetTableId],
-          items: dbPendingItems,
-          customerName: session?.activeOrderId?.customerName || prev[targetTableId]?.customerName || '',
-          customerPhone: session?.activeOrderId?.customerPhone || prev[targetTableId]?.customerPhone || '',
-          discount: session?.activeOrderId?.discount?.toString() || prev[targetTableId]?.discount || ''
+      setTableBills(prev => {
+        const localItems = prev[targetTableId]?.items || [];
+        // If local items exist but DB pending items are empty, keep local items to avoid race condition
+        if (localItems.length > 0 && dbPendingItems.length === 0) {
+          return prev;
         }
-      }));
+        return {
+          ...prev,
+          [targetTableId]: {
+            ...prev[targetTableId],
+            items: dbPendingItems.length > 0 ? dbPendingItems : localItems,
+            customerName: session?.activeOrderId?.customerName || prev[targetTableId]?.customerName || '',
+            customerPhone: session?.activeOrderId?.customerPhone || prev[targetTableId]?.customerPhone || '',
+            discount: session?.activeOrderId?.discount?.toString() || prev[targetTableId]?.discount || ''
+          }
+        };
+      });
 
       setActiveOrder(orderId);
       setKots(session?.kotIds || []);
@@ -527,12 +531,8 @@ export default function BillingPage() {
   // Helper: fire a print job (tries backend direct print first, falls back to browser dialog)
   const firePrint = async (html, documentType = 'document') => {
     try {
-      const response = await fetch('/api/print', {
+      const response = await authFetch(apiUrl('/api/print'), {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('humtum_token_v2')}`
-        },
         body: JSON.stringify({ html, documentType })
       });
       if (response.ok) {
@@ -543,8 +543,36 @@ export default function BillingPage() {
       const errData = await response.json().catch(() => ({}));
       throw new Error(errData.error || 'Server print failure');
     } catch (err) {
-      console.warn('Direct backend print failed:', err);
-      showToast(`Print failed: ${err.message || 'Direct printing error'}`, 'error');
+      console.warn('Direct backend print failed, falling back to browser print:', err);
+      
+      // Fallback: Browser Print Dialog
+      try {
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+        
+        const doc = iframe.contentDocument || iframe.contentWindow.document;
+        doc.open();
+        doc.write(html);
+        doc.close();
+        
+        // Wait for images / assets to load and print
+        setTimeout(() => {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+          document.body.removeChild(iframe);
+        }, 500);
+        
+        showToast('Backend print failed. Fallback: browser print dialog opened.', 'info');
+      } catch (printErr) {
+        console.error('Browser print fallback failed:', printErr);
+        showToast(`Print failed: ${err.message || 'Direct printing error'}`, 'error');
+      }
     }
   };
 
