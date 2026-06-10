@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { ArrowLeft, Search, Trash2, Printer, UtensilsCrossed, X, Menu } from 'lucide-react';
 import { apiUrl, authFetch } from '../lib/api';
-import qz from 'qz-tray';
 const PM = ['cash', 'card', 'upi'];
+const qz = window.qz;
 
 /* COMPACT TABLE PILL */
 function TableCard({ id, isActive, status, num, onClick }) {
@@ -620,7 +620,8 @@ export default function BillingPage() {
       } catch (err) {
         console.error('QZ Tray print failed:', err);
         showToast('QZ Tray Error: ' + (err.message || err), 'error');
-        return; // Don't fall back to directServer if QZ Tray fails
+        runBrowserPrint();
+        return;
       }
     }
 
