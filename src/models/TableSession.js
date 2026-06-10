@@ -18,7 +18,7 @@ const tableSessionSchema = new mongoose.Schema({
   orderType:     { type: String, enum: ['dine-in', 'takeaway', 'delivery'], default: 'dine-in' },
   // Store items added during session for atomicity
   pendingItems: [{
-    menuItemId: { type: String },
+    menuItemId: { type: mongoose.Schema.Types.ObjectId, ref: 'MenuItem' },
     name:       { type: String },
     quantity:   { type: Number },
     price:      { type: Number },
