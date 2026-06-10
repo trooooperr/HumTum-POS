@@ -109,6 +109,7 @@ export function AppProvider({ children }) {
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       reconnectionAttempts: 5,
+      transports: ['websocket'], // Force websocket to fix Render disconnect loops
       auth: {
         token: localStorage.getItem(TOKEN_KEY),
       }
