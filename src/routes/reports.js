@@ -58,27 +58,12 @@ async function createTransport(emailConfig) {
     });
   }
 
-  let host = 'smtp.gmail.com';
-  try {
-    const addresses = await dns.resolve4(host);
-    if (addresses && addresses.length > 0) {
-      host = addresses[0];
-    }
-  } catch (err) {
-    console.warn('DNS resolve4 failed for Gmail, falling back to hostname', err.message);
-  }
-
   return nodemailer.createTransport({
-    host,
-    port: 587,
-    secure: false, // true for 465, false for other ports
+    service: 'gmail',
     auth: {
       user: emailConfig.authEmail,
       pass: emailConfig.senderPassword,
     },
-    tls: {
-      servername: 'smtp.gmail.com' // Crucial for SSL when connecting via IP
-    }
   });
 }
 

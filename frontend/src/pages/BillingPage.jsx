@@ -655,6 +655,7 @@ export default function BillingPage() {
         </style>
       </head>
       <body>
+        <div class="header" style="font-size: 14px;">${printerLabel.toUpperCase()} KOT</div>
         <div class="header">${kot.kotNo} &nbsp;&nbsp;|&nbsp;&nbsp; Table: ${tableNo}</div>
         <div class="sub">${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</div>
         <div class="divider"></div>
