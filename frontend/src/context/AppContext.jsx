@@ -723,7 +723,7 @@ export function AppProvider({ children }) {
       });
       if (socket) {
         socket.emit('join-table', tableNo);
-        socket.emit('table-updated', { tableNo });
+        socket.emit('table-updated', { tableNo, senderId: socket.id });
       }
       return session;
     } catch (err) {
@@ -749,7 +749,7 @@ export function AppProvider({ children }) {
         return [...filtered, session];
       });
       if (socket) {
-        socket.emit('table-updated', { tableNo });
+        socket.emit('table-updated', { tableNo, senderId: socket.id });
       }
       return session;
     } catch (err) {

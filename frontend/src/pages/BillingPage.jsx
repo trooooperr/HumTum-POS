@@ -327,7 +327,7 @@ export default function BillingPage() {
 
 
   // When table is selected, load/open session
-  const ensureActiveOrder = async (tableIdOverride) => {
+  const ensureActiveOrder = async (tableIdOverride, createIfMissing = true) => {
     const targetTableId = tableIdOverride || activeTableId;
     if (!targetTableId) return null;
     const tableNo = parseInt(targetTableId.substring(1));
@@ -339,13 +339,33 @@ export default function BillingPage() {
       if (response.ok) {
         session = await response.json();
       } else if (response.status === 404) {
+        if (!createIfMissing) {
+          setActiveOrder(null);
+          setKots([]);
+          return null;
+        }
         session = await openTableSession(tableNo, selectedWaiterObj?.name || '', orderType);
       } else {
         throw new Error('Unable to load table session');
       }
 
+      // Check if session has a message indicating no active session (our backend returns 200 with { message: 'No active session' })
+      if (session && session.message === 'No active session') {
+        if (!createIfMissing) {
+          setActiveOrder(null);
+          setKots([]);
+          return null;
+        }
+        session = await openTableSession(tableNo, selectedWaiterObj?.name || '', orderType);
+      }
+
       const orderId = session?.activeOrderId?._id || session?.activeOrderId;
       if (!orderId) {
+        if (!createIfMissing) {
+          setActiveOrder(null);
+          setKots([]);
+          return null;
+        }
         const newSession = await openTableSession(tableNo, selectedWaiterObj?.name || '', orderType);
         const newOrderId = newSession?.activeOrderId?._id || newSession?.activeOrderId;
         if (!newOrderId) throw new Error('Unable to determine active order');
@@ -453,22 +473,34 @@ export default function BillingPage() {
 
     socket.emit('join-table', tableNo);
 
-    const handleUpdate = () => {
-      ensureActiveOrder().catch(() => { });
+    const handleUpdate = (data) => {
+      // If we triggered the update, ignore it to prevent race conditions
+      if (data && data.senderId === socket.id) {
+        return;
+      }
+      ensureActiveOrder(undefined, false).catch(() => { });
+    };
+
+    const handleOrderCompleted = () => {
+      // Clean up frontend state immediately and do NOT fetch/reopen
+      clearTable(activeTableId);
+      setActiveOrder(null);
+      setKots([]);
+      setSelectedWaiter('');
     };
 
     socket.on('KOT_UPDATED', handleUpdate);
     socket.on('NEW_KOT', handleUpdate);
     socket.on('TABLE_UPDATED', handleUpdate);
-    socket.on('ORDER_COMPLETED', handleUpdate);
+    socket.on('ORDER_COMPLETED', handleOrderCompleted);
 
     return () => {
       socket.off('KOT_UPDATED', handleUpdate);
       socket.off('NEW_KOT', handleUpdate);
       socket.off('TABLE_UPDATED', handleUpdate);
-      socket.off('ORDER_COMPLETED', handleUpdate);
+      socket.off('ORDER_COMPLETED', handleOrderCompleted);
     };
-  }, [activeTableId, socket]);
+  }, [activeTableId, socket, clearTable]);
 
   // Print KOT
   const printKOT = async () => {

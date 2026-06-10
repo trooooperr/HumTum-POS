@@ -150,7 +150,7 @@ router.post('/', async (req, res) => {
 
     // Update or create table session
     await TableSession.findOneAndUpdate(
-      { tableNo },
+      { activeOrderId: orderId },
       {
         $set: { status: 'KOT_SENT', lastActivityAt: new Date(), totalAmount: order.grandTotal },
         $push: { kotIds: saved._id }

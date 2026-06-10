@@ -63,15 +63,25 @@ router.post('/table/:tableNo/open', async (req, res) => {
     const { tableNo } = req.params;
     const { waiterName, orderType } = req.body;
     
-    // Check if table is already open
-    const existingSession = await TableSession.findOne({ tableNo: parseInt(tableNo), status: { $ne: 'COMPLETED' } }).populate('activeOrderId');
-    if (existingSession) {
-      if (!existingSession.activeOrderId) {
-        // Clean up orphaned session
-        await TableSession.deleteOne({ _id: existingSession._id });
+    // Check if table is already open, heal duplicate/orphaned sessions
+    const activeSessions = await TableSession.find({ tableNo: parseInt(tableNo), status: { $ne: 'COMPLETED' } }).populate('activeOrderId');
+    let existingSession = null;
+    for (const session of activeSessions) {
+      if (!session.activeOrderId || !session.activeOrderId.isActive) {
+        // Clean up orphaned or inactive session
+        await TableSession.deleteOne({ _id: session._id });
       } else {
-        return res.status(200).json(existingSession);
+        if (!existingSession) {
+          existingSession = session;
+        } else {
+          // Clean up duplicate session
+          await TableSession.deleteOne({ _id: session._id });
+        }
       }
+    }
+
+    if (existingSession) {
+      return res.status(200).json(existingSession);
     }
 
     // Clean up any old completed sessions for this table to prevent Duplicate Key errors
@@ -137,22 +147,29 @@ router.get('/sessions/active', async (req, res) => {
 router.get('/table/:tableNo/session', async (req, res) => {
   try {
     const { tableNo } = req.params;
-    const session = await TableSession.findOne({ tableNo: parseInt(tableNo), status: { $ne: 'COMPLETED' } })
+    const sessions = await TableSession.find({ tableNo: parseInt(tableNo), status: { $ne: 'COMPLETED' } })
       .populate('kotIds')
       .populate('activeOrderId');
     
-    if (!session) {
+    let activeSession = null;
+    for (const session of sessions) {
+      if (!session.activeOrderId || !session.activeOrderId.isActive) {
+        await TableSession.deleteOne({ _id: session._id });
+      } else {
+        if (!activeSession) {
+          activeSession = session;
+        } else {
+          await TableSession.deleteOne({ _id: session._id });
+        }
+      }
+    }
+    
+    if (!activeSession) {
       // Return 200 instead of 404 to prevent harmless frontend network errors
       return res.status(200).json({ message: 'No active session' });
     }
     
-    // Check if activeOrderId is orphaned
-    if (!session.activeOrderId) {
-      await TableSession.deleteOne({ _id: session._id });
-      return res.status(200).json({ message: 'No active session' });
-    }
-    
-    res.json(session);
+    res.json(activeSession);
   } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
@@ -162,20 +179,27 @@ router.put('/table/:tableNo/session', async (req, res) => {
     const { tableNo } = req.params;
     const { pendingItems, totalAmount, waiterName, orderType } = req.body;
     
-    const existingSession = await TableSession.findOne({ tableNo: parseInt(tableNo), status: { $ne: 'COMPLETED' } });
-    if (!existingSession) {
+    const sessions = await TableSession.find({ tableNo: parseInt(tableNo), status: { $ne: 'COMPLETED' } });
+    let activeSession = null;
+    for (const session of sessions) {
+      if (!session.activeOrderId) {
+        await TableSession.deleteOne({ _id: session._id });
+      } else {
+        if (!activeSession) {
+          activeSession = session;
+        } else {
+          await TableSession.deleteOne({ _id: session._id });
+        }
+      }
+    }
+    
+    if (!activeSession) {
       // Return 200 instead of 404 to prevent harmless frontend network errors during checkout race conditions
       return res.status(200).json({ message: 'No active session found (likely completed)' });
     }
-    
-    // Check if activeOrderId is orphaned
-    if (!existingSession.activeOrderId) {
-      await TableSession.deleteOne({ _id: existingSession._id });
-      return res.status(200).json({ message: 'Orphaned session cleaned up' });
-    }
 
-    const session = await TableSession.findOneAndUpdate(
-      { tableNo: parseInt(tableNo), status: { $ne: 'COMPLETED' } },
+    const session = await TableSession.findByIdAndUpdate(
+      activeSession._id,
       { 
         $set: { 
           pendingItems: pendingItems || [],
@@ -189,7 +213,10 @@ router.put('/table/:tableNo/session', async (req, res) => {
     ).populate('activeOrderId').populate('kotIds');
     
     res.json(session);
-  } catch (err) { res.status(400).json({ message: err.message }); }
+  } catch (err) { 
+    console.error('Update Table Session Error:', err);
+    res.status(400).json({ message: err.message }); 
+  }
 });
 
 // ── CREATE ORDER (called when opening table) ────────────────────
@@ -227,18 +254,20 @@ router.post('/', async (req, res) => {
     }
 
     // Create/update table session
-    await TableSession.findOneAndUpdate(
-      { tableNo: orderData.tableNo },
-      {
-        $set: { 
-          status: isDirectOrder && orderData.dueAmount === 0 ? 'COMPLETED' : 'OPEN', 
-          activeOrderId: saved._id,
-          lastActivityAt: new Date(),
-          totalAmount: orderData.grandTotal || 0
-        }
-      },
-      { upsert: true, new: true }
-    );
+    if (orderData.tableNo) {
+      await TableSession.findOneAndUpdate(
+        { tableNo: orderData.tableNo, status: { $ne: 'COMPLETED' } },
+        {
+          $set: { 
+            status: isDirectOrder && orderData.dueAmount === 0 ? 'COMPLETED' : 'OPEN', 
+            activeOrderId: saved._id,
+            lastActivityAt: new Date(),
+            totalAmount: orderData.grandTotal || 0
+          }
+        },
+        { upsert: true, new: true }
+      );
+    }
 
     const response = saved.toObject();
     if (directOrderInventory) response.inventory = directOrderInventory;
@@ -346,7 +375,7 @@ router.patch('/:id/settle', async (req, res) => {
 
     // Update table session
     await TableSession.findOneAndUpdate(
-      { tableNo: order.tableNo },
+      { activeOrderId: order._id },
       { 
         $set: { 
           paymentReceived: true, 
@@ -373,7 +402,7 @@ router.patch('/:id/complete', async (req, res) => {
     const saved = await order.save();
 
     // Mark table session as completed and delete it to free the table index
-    await TableSession.findOneAndDelete({ tableNo: order.tableNo });
+    await TableSession.findOneAndDelete({ activeOrderId: order._id });
 
     res.json(saved);
     await deleteCache([ORDERS_CACHE_KEY, REPORT_SUMMARY_CACHE_KEY]);
