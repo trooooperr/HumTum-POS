@@ -5,8 +5,8 @@
   "main": "server.js",
   "scripts": {
     "build": "npm --prefix frontend run build",
-    "start": "node server.js",
-    "dev": "nodemon server.js",
+    "start": "node --dns-result-order=ipv4first server.js",
+    "dev": "NODE_OPTIONS='--dns-result-order=ipv4first' nodemon server.js",
     "test": "jest --runInBand"
   },
   "dependencies": {

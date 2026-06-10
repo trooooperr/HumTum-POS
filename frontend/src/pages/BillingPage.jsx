@@ -588,8 +588,10 @@ export default function BillingPage() {
         
         // Wait for images / assets to load and print
         setTimeout(() => {
+          printWindow.addEventListener('afterprint', () => {
+            printWindow.close();
+          });
           printWindow.print();
-          // We do not auto-close the window so the user can debug margins
         }, 500);
       } catch (printErr) {
         console.error('Browser print failed:', printErr);
@@ -631,7 +633,7 @@ export default function BillingPage() {
       <head>
         <title>${printerLabel}</title>
         <style>
-          @page { size: 80mm auto; margin: 4mm; }
+          @page { size: 80mm auto; margin: 2mm; }
           body { font-family: monospace; width: 72mm; margin: 0; padding: 0; font-size: 12px; }
           .header { text-align: center; font-weight: bold; margin-bottom: 6px; font-size: 11px; }
           .sub { text-align: center; font-size: 11px; margin-bottom: 4px; }
@@ -751,7 +753,6 @@ export default function BillingPage() {
             <div style="font-size: 9px; margin-top: 2px;">SCAN TO PAY</div>
             
             <div class="footer-msg">${settings.thankYouMsg || 'THANK YOU FOR VISITING!'}</div>
-            ${settings.phone ? `<div style="font-size: 9px; margin-top: 4px;">Ph: ${settings.phone}</div>` : ''}
           </div>
         </body>
       </html>
