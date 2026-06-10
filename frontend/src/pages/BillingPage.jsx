@@ -482,32 +482,38 @@ export default function BillingPage() {
       setBusy(true);
       const tableNo = parseInt(activeTableId.substring(1));
 
-      // Create KOT
-      const kot = await createKOT(
-        orderId,
-        tableNo,
-        table.items.map(i => {
-          const master = allSellableItems.find(m => String(m._id) === String(i._id) || m.name === i.name);
-          const isInv = i.isInventory || master?.isInventory || false;
-          return {
-            menuItemId: i._id,
-            name: i.name,
-            quantity: i.quantity,
-            price: i.price,
-            department: isInv ? 'bar' : (master?.department || i.department || 'kitchen'),
-            note: i.note || ''
-          };
-        }),
-        '',
-        selectedWaiterObj?.name || '',
-        orderType
-      );
+      const itemsToSubmit = table.items.map(i => {
+        const master = allSellableItems.find(m => String(m._id) === String(i._id) || m.name === i.name);
+        const isInv = i.isInventory || master?.isInventory || false;
+        return {
+          menuItemId: i._id,
+          name: i.name,
+          quantity: i.quantity,
+          price: i.price,
+          department: isInv ? 'bar' : (master?.department || i.department || 'kitchen'),
+          note: i.note || ''
+        };
+      });
 
-      // Add to KOT list
-      setKots(prev => [...prev, kot]);
+      const barItems = itemsToSubmit.filter(i => i.department === 'bar');
+      const kitchenItems = itemsToSubmit.filter(i => i.department !== 'bar');
 
-      // Print the KOT
-      printKOTDocument(kot, tableNo);
+      // Create separate KOTs for Kitchen and Bar to ensure separate KOT numbers
+      if (kitchenItems.length > 0) {
+        const kot = await createKOT(
+          orderId, tableNo, kitchenItems, '', selectedWaiterObj?.name || '', orderType
+        );
+        setKots(prev => [...prev, kot]);
+        printKOTDocument(kot, tableNo);
+      }
+
+      if (barItems.length > 0) {
+        const kot = await createKOT(
+          orderId, tableNo, barItems, '', selectedWaiterObj?.name || '', orderType
+        );
+        setKots(prev => [...prev, kot]);
+        printKOTDocument(kot, tableNo);
+      }
 
       // Clear items for next KOT
       clearTable(activeTableId);
@@ -649,16 +655,14 @@ export default function BillingPage() {
         </style>
       </head>
       <body>
-        <div class="header">*** ${printerLabel} KOT ***</div>
-        <div class="sub">KOT #${kot.kotNo} &nbsp;|&nbsp; Table T${tableNo}</div>
-        <div class="sub">Time: ${new Date().toLocaleTimeString()}</div>
+        <div class="header">${kot.kotNo} &nbsp;&nbsp;|&nbsp;&nbsp; Table: ${tableNo}</div>
+        <div class="sub">${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</div>
         <div class="divider"></div>
         ${items.map(i => `
-          <div class="item"><span class="qty">${i.quantity}x</span><span>${i.name}</span></div>
+          <div class="item"><span>${i.name}</span><span class="qty">${i.quantity}</span></div>
           ${i.note ? `<div class="note">Note: ${i.note}</div>` : ''}
         `).join('')}
         <div class="divider"></div>
-        <div style="text-align:center;font-size:10px;">${new Date().toLocaleDateString()}</div>
       </body>
     </html>
   `;
