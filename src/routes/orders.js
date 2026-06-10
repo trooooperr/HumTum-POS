@@ -141,12 +141,15 @@ router.get('/table/:tableNo/session', async (req, res) => {
       .populate('kotIds')
       .populate('activeOrderId');
     
-    if (!session) return res.status(404).json({ message: 'No active session' });
+    if (!session) {
+      // Return 200 instead of 404 to prevent harmless frontend network errors
+      return res.status(200).json({ message: 'No active session' });
+    }
     
     // Check if activeOrderId is orphaned
     if (!session.activeOrderId) {
       await TableSession.deleteOne({ _id: session._id });
-      return res.status(404).json({ message: 'No active session' });
+      return res.status(200).json({ message: 'No active session' });
     }
     
     res.json(session);
@@ -161,13 +164,14 @@ router.put('/table/:tableNo/session', async (req, res) => {
     
     const existingSession = await TableSession.findOne({ tableNo: parseInt(tableNo), status: { $ne: 'COMPLETED' } });
     if (!existingSession) {
-      return res.status(404).json({ message: 'No active session found for this table' });
+      // Return 200 instead of 404 to prevent harmless frontend network errors during checkout race conditions
+      return res.status(200).json({ message: 'No active session found (likely completed)' });
     }
     
     // Check if activeOrderId is orphaned
     if (!existingSession.activeOrderId) {
       await TableSession.deleteOne({ _id: existingSession._id });
-      return res.status(404).json({ message: 'No active session found for this table' });
+      return res.status(200).json({ message: 'Orphaned session cleaned up' });
     }
 
     const session = await TableSession.findOneAndUpdate(

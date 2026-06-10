@@ -741,6 +741,8 @@ export function AppProvider({ children }) {
       });
       if (!res.ok) throw new Error('Failed to sync session');
       const session = await res.json();
+      if (session.message) return null; // Harmless race condition (session already completed)
+      
       setCurrentSession(session);
       setActiveSessions(prev => {
         const filtered = prev.filter(s => s.tableNo !== session.tableNo);
