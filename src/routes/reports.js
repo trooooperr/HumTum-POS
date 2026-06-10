@@ -214,10 +214,7 @@ router.post('/send-daily', requireRole(['admin', 'manager']), async (req, res) =
 // ── GET /daily-html (For External Cron / Google Apps Script) ───
 router.get('/daily-html', async (req, res) => {
   try {
-    const { token } = req.query;
-    if (!token || token !== (process.env.CRON_SECRET || process.env.JWT_SECRET)) {
-      return res.status(401).send('Unauthorized: Invalid CRON_SECRET token');
-    }
+    // Note: Request is already authenticated by `allowCronSecret` middleware in app.js
     
     const persistedSettings = await getPersistedSettings();
     const resolvedSettings = {
