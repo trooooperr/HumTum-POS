@@ -693,7 +693,7 @@ export default function BillingPage() {
         <div class="divider"></div>
         ${items.map(i => `
           <div class="item"><span>${i.name}</span><span class="qty">${i.quantity}</span></div>
-          ${(i.notes || i.note) ? `<div class="note">Note: ${i.notes || i.note}</div>` : ''}
+          ${(i.notes || i.note) ? `<div class="note">${i.notes || i.note}</div>` : ''}
         `).join('')}
         <div class="divider"></div>
       </body>

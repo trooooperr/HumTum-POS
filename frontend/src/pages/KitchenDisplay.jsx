@@ -99,7 +99,7 @@ export default function KitchenDisplay({ department = 'kitchen' }) {
   const [kots, setKots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(false);
   const [selectedTable, setSelectedTable] = useState(null);
   const [tableSearch, setTableSearch] = useState('');
   const loadKOTs = async () => {
