@@ -728,20 +728,20 @@ export default function BillingPage() {
           <title>${settings.barPrinterName || 'BAR'} BILL</title>
           <style>
             @page { size: 80mm auto; margin: 2mm; }
-            body { font-family: 'Courier New', Courier, monospace; width: 74mm; margin: 0; padding: 0; font-size: 11px; color: #000; line-height: 1.2; }
+            body { font-family: 'Courier New', Courier, monospace; width: 74mm; margin: 0; padding: 0; font-size: 13px; color: #000; line-height: 1.2; }
             .center { text-align: center; }
-            .brand { font-size: 16px; font-weight: 900; margin-bottom: 2px; text-transform: uppercase; }
-            .address { font-size: 10px; margin-bottom: 6px; line-height: 1.2; }
+            .brand { font-size: 18px; font-weight: 900; margin-bottom: 2px; text-transform: uppercase; }
+            .address { font-size: 12px; margin-bottom: 6px; line-height: 1.2; }
             .dash-line { border-top: 1px dashed #000; margin: 6px 0; }
             .thick-line { border-top: 2px solid #000; margin: 4px 0; }
-            .row { display: flex; justify-content: space-between; margin-bottom: 2px; font-size: 10px; }
-            .item-header { font-size: 10px; font-weight: 900; display: flex; margin-bottom: 4px; border-bottom: 1px solid #000; padding-bottom: 2px; }
-            .item-row { display: flex; margin-bottom: 3px; align-items: flex-start; font-size: 10px; }
+            .row { display: flex; justify-content: space-between; margin-bottom: 2px; font-size: 12px; }
+            .item-header { font-size: 12px; font-weight: 900; display: flex; margin-bottom: 4px; border-bottom: 1px solid #000; padding-bottom: 2px; }
+            .item-row { display: flex; margin-bottom: 3px; align-items: flex-start; font-size: 12px; }
             .col-name { flex: 1; padding-right: 4px; text-transform: uppercase; }
-            .col-qty { width: 30px; text-align: center; }
-            .col-amt { width: 55px; text-align: right; font-weight: bold; }
-            .footer-msg { font-size: 10px; margin-top: 10px; font-weight: bold; font-style: italic; }
-            .qr-code { width: 70px; height: 70px; margin: 8px auto 2px; display: block; }
+            .col-qty { width: 35px; text-align: center; }
+            .col-amt { width: 65px; text-align: right; font-weight: bold; }
+            .footer-msg { font-size: 12px; margin-top: 10px; font-weight: bold; font-style: italic; }
+            .qr-code { width: 130px; height: 130px; margin: 8px auto 2px; display: block; }
           </style>
         </head>
         <body>
@@ -782,7 +782,7 @@ export default function BillingPage() {
 
           <div class="thick-line"></div>
           
-          <div class="row" style="font-size: 14px; font-weight: 900; margin: 4px 0;">
+          <div class="row" style="font-size: 16px; font-weight: 900; margin: 4px 0;">
             <span>TOTAL PAYABLE</span>
             <span>Rs. ${total.toFixed(0)}</span>
           </div>
@@ -791,8 +791,8 @@ export default function BillingPage() {
 
           <div class="center">
             <!-- Dummy QR Code image: replace URL with real payment integration later -->
-            <img class="qr-code" src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=dummy@upi&pn=HUMTUM&am=${total.toFixed(0)}" alt="QR Code" />
-            <div style="font-size: 9px; margin-top: 2px;">SCAN TO PAY</div>
+            <img class="qr-code" src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=dummy@upi&pn=HUMTUM&am=${total.toFixed(0)}" alt="QR Code" />
+            <div style="font-size: 11px; margin-top: 2px;">SCAN TO PAY</div>
             
             <div class="footer-msg">${settings.thankYouMsg || 'THANK YOU FOR VISITING!'}</div>
           </div>

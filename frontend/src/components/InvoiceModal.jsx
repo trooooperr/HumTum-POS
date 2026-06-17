@@ -28,14 +28,14 @@ export default function InvoiceModal() {
               width: 270px; /* Standard 58mm/80mm thermal width */
               margin: auto; 
               line-height: 1.2;
-              font-size: 12px;
+              font-size: 13px;
             }
             .center { text-align: center; }
             .bold { font-weight: 900; }
             
             /* Header Styling */
-            .brand { font-size: 16px; font-weight: 900; margin-bottom: 2px; text-transform: uppercase; }
-            .address { font-size: 10px; margin-bottom: 8px; line-height: 1.3; }
+            .brand { font-size: 18px; font-weight: 900; margin-bottom: 2px; text-transform: uppercase; }
+            .address { font-size: 11px; margin-bottom: 8px; line-height: 1.3; }
             
             /* Separators */
             .dash-line { border-top: 1px dashed #000; margin: 10px 0; }
@@ -43,7 +43,7 @@ export default function InvoiceModal() {
 
             /* Table Grid */
             .row { display: flex; justify-content: space-between; margin-bottom: 3px; }
-            .item-header { font-size: 11px; font-weight: 900; display: flex; margin-bottom: 5px; border-bottom: 1px solid #000; padding-bottom: 3px; }
+            .item-header { font-size: 12px; font-weight: 900; display: flex; margin-bottom: 5px; border-bottom: 1px solid #000; padding-bottom: 3px; }
             .item-row { display: flex; margin-bottom: 4px; align-items: flex-start; }
             
             /* Column Widths */
@@ -55,10 +55,10 @@ export default function InvoiceModal() {
             .total-container {
               text-align: center;
             }
-            .total-label { font-size: 12px; font-weight: 600; letter-spacing: 1px; margin: 4px; }
-            .total-amount { font-size: 10px; }
+            .total-label { font-size: 14px; font-weight: 600; letter-spacing: 1px; margin: 4px; }
+            .total-amount { font-size: 11px; }
             
-            .footer-msg { font-size: 10px; margin-top: 15px; font-weight: bold; font-style: italic; }
+            .footer-msg { font-size: 11px; margin-top: 15px; font-weight: bold; font-style: italic; }
           </style>
         </head>
         <body>
@@ -70,8 +70,8 @@ export default function InvoiceModal() {
           <div class="dash-line"></div>
 
           <div class="row"><span>BILL: HTB-${(o.billNo || '').split('-').pop()}</span><span>TABLE: ${o.tableNo}</span></div>
-          <div class="row" style="font-size: 10px;">DATE: ${new Date(o.date).toLocaleString('en-IN')}</div>
-          ${o.waiterName ? `<div class="row" style="font-size: 10px;">WAITER: ${o.waiterName.toUpperCase()}</div>` : ''}
+          <div class="row" style="font-size: 11px;">DATE: ${new Date(o.date).toLocaleString('en-IN')}</div>
+          ${o.waiterName ? `<div class="row" style="font-size: 11px;">WAITER: ${o.waiterName.toUpperCase()}</div>` : ''}
 
           <div class="dash-line"></div>
 
@@ -101,7 +101,7 @@ export default function InvoiceModal() {
             <div class="total-label">NET PAYABLE AMOUNT ${s.currency}${roundedGrandTotal}</div>
           </div>
 
-          <div class="center" style="margin-top: 10px; font-size: 12px; font-weight: 900;">
+          <div class="center" style="margin-top: 10px; font-size: 13px; font-weight: 900;">
             PAID VIA ${o.paymentMode?.toUpperCase()}
           </div>
 
