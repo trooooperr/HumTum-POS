@@ -16,6 +16,7 @@ const workerSchema = new mongoose.Schema({
     }
   },
   email: { type: String, default: '', trim: true, lowercase: true },
+  upiId: { type: String, default: '', trim: true },
   joiningDate: { type: Date, default: Date.now },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 }, { timestamps: true });

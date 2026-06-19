@@ -71,9 +71,9 @@ function WorkerModal({ worker, onClose, onSave }) {
     name: worker?.name || '',
     role: worker?.role || 'Waiter',
     salary: worker?.salary || '',
-    paidSalary: 0,
     contact: worker?.contact || '',
     joiningDate: worker?.joiningDate ? worker.joiningDate.split('T')[0] : new Date().toISOString().split('T')[0],
+    upiId: worker?.upiId || '',
   });
   const [error, setError] = useState('');
 
@@ -114,6 +114,11 @@ function WorkerModal({ worker, onClose, onSave }) {
           <label className="lbl">{worker ? "Add Payment (₹)" : "Initial Payment (₹)"}</label>
           <input type="number" value={form.paidSalary} onChange={e => setForm({ ...form, paidSalary: e.target.value })} placeholder="0" />
           {worker && <div style={{ fontSize: '10px', color: 'var(--green)', marginTop: '4px' }}>Total Paid: ₹{worker.paidSalary.toLocaleString()}</div>}
+        </div>
+
+        <div className="fgroup">
+          <label className="lbl">UPI ID for Tips (Optional)</label>
+          <input value={form.upiId} onChange={e => setForm({ ...form, upiId: e.target.value })} placeholder="e.g. waiter@upi" />
         </div>
 
         {error && <div className="badge b-red" style={{ width: '100%', padding: '8px', marginBottom: '12px' }}>{error}</div>}

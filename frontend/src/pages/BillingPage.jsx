@@ -318,10 +318,18 @@ export default function BillingPage() {
       const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUrl)}`;
       const img = new Image();
       img.src = qrCodeUrl;
+
+      // Pre-load waiter tip QR code if assigned and has UPI ID
+      if (selectedWaiterObj?.upiId) {
+        const waiterUpiUrl = `upi://pay?pa=${encodeURIComponent(selectedWaiterObj.upiId)}&pn=${encodeURIComponent(selectedWaiterObj.name)}&cu=INR`;
+        const waiterTipQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(waiterUpiUrl)}`;
+        const img2 = new Image();
+        img2.src = waiterTipQrUrl;
+      }
     } catch (e) {
       console.error('Background QR pre-load error:', e);
     }
-  }, [activeTableId, grandTotal, settings.upiId, settings.restaurantName, settings.includeUpiAmount]);
+  }, [activeTableId, grandTotal, settings.upiId, settings.restaurantName, settings.includeUpiAmount, selectedWaiterObj]);
 
   useEffect(() => {
     if (!isResizing) return;
@@ -749,6 +757,11 @@ export default function BillingPage() {
     const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(merchantName)}${includeAmount ? `&am=${total.toFixed(0)}` : ''}&cu=INR`;
     const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUrl)}`;
 
+    // Generate Waiter Tip QR Code if assigned and has UPI ID
+    const waiterTipQrUrl = selectedWaiterObj?.upiId
+      ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=${encodeURIComponent(selectedWaiterObj.upiId)}&pn=${encodeURIComponent(selectedWaiterObj.name)}&cu=INR`)}`
+      : '';
+
     const html = `
       <html>
         <head>
@@ -817,10 +830,19 @@ export default function BillingPage() {
           <div class="thick-line"></div>
 
           <div class="center">
+            <div style="font-size: 13px; font-weight: bold; margin-bottom: 4px;">SCAN TO PAY BILL</div>
             <!-- Dynamic QR Code generated from UPI settings -->
             <img class="qr-code" src="${qrCodeUrl}" alt="QR Code" />
-            <div style="font-size: 11px; margin-top: 2px;">SCAN TO PAY</div>
+            <div style="font-size: 11px; margin-top: 2px; font-weight: bold;">Amount: Rs. ${total.toFixed(0)}</div>
             
+            ${waiterTipQrUrl ? `
+              <div class="dash-line" style="margin: 12px 0 8px 0;"></div>
+              <div style="font-size: 13px; font-weight: bold; margin-bottom: 2px;">TIP YOUR WAITER</div>
+              <div style="font-size: 11px; color: #555; margin-bottom: 4px;">Scan to Tip ${selectedWaiterObj.name.toUpperCase()} directly</div>
+              <img class="qr-code" style="width: 100px; height: 100px; margin: 4px auto 2px; display: block;" src="${waiterTipQrUrl}" alt="Tip QR Code" />
+            ` : ''}
+
+            <div class="dash-line" style="margin-top: 10px;"></div>
             <div class="footer-msg">${settings.thankYouMsg || 'THANK YOU FOR VISITING!'}</div>
           </div>
         </body>
