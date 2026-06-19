@@ -573,7 +573,7 @@ export default function BillingPage() {
       const tableNo = parseInt(activeTableId.substring(1));
 
       // Finalize bill (combines all KOTs and leftover items)
-      await finalizeBill(
+      const finalizedOrder = await finalizeBill(
         orderId,
         combinedItems.all,
         subtotal,
@@ -589,7 +589,7 @@ export default function BillingPage() {
       );
 
       // Print bill
-      printBillDocument(tableNo, { items: combinedItems.all }, grandTotal, selectedWaiterObj?.name || '');
+      printBillDocument(tableNo, { items: combinedItems.all }, grandTotal, selectedWaiterObj?.name || '', finalizedOrder?.billNo);
 
       // Mark order as complete
       await completeOrder(orderId);
@@ -718,9 +718,9 @@ export default function BillingPage() {
     }
   };
 
-  const printBillDocument = (tableNo, table, total, waiterName = '') => {
+  const printBillDocument = (tableNo, table, total, waiterName = '', billNoOverride = '') => {
     // Generate bill number similar to InvoiceModal
-    const tempBillNo = 'HTB-' + String(Date.now()).slice(-5);
+    const tempBillNo = billNoOverride ? `HTB-${billNoOverride.split('-').pop()}` : ('HTB-' + String(Date.now()).slice(-5));
     
     const html = `
       <html>
