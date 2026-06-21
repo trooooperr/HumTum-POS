@@ -395,25 +395,25 @@ export function AppProvider({ children }) {
       return `https://placehold.co/320x320/171921/F59E0B?text=${encodeURIComponent(item.name?.slice(0,1) || 'I')}`;
     };
 
-    const drinkItems = inv
-      .filter(i => {
-        // Only merge if not already in menu to avoid duplicates
-        return !menu.some(m => m.name.toLowerCase() === i.name.toLowerCase());
+    const processedMenu = menu
+      .filter(m => {
+        // Exclude if it exists in inventory, so it's fetched from inventory instead
+        return !inv.some(i => (i.name || '').toLowerCase().trim() === (m.name || '').toLowerCase().trim());
       })
-      .map(i => ({ 
-        ...i, 
-        department: 'bar',
-        imageUrl: getImg(i),
-        available: i.stock > 0, 
-        isInventory: true 
+      .map(m => ({
+        ...m,
+        department: m.department || 'kitchen',
+        imageUrl: getImg(m),
+        available: m.available !== false,
+        isInventory: false
       }));
-    
-    const processedMenu = menu.map(m => ({
-      ...m,
-      department: m.department || 'kitchen',
-      imageUrl: getImg(m),
-      available: m.available !== false,
-      isInventory: false
+
+    const drinkItems = inv.map(i => ({ 
+      ...i, 
+      department: 'bar',
+      imageUrl: getImg(i),
+      available: i.stock > 0, 
+      isInventory: true 
     }));
 
     return [...processedMenu, ...drinkItems];
