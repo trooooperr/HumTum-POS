@@ -59,6 +59,9 @@ router.post('/sync', requireRole(['admin', 'manager']), async (req, res) => {
       );
     }
     await deleteCache([MENU_CACHE_KEY, INVENTORY_CACHE_KEY]);
+    if (req.app.locals.io) {
+      req.app.locals.io.emit('REFRESH_MENU');
+    }
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -73,6 +76,9 @@ router.post('/', requireRole(['admin', 'manager']), async (req, res) => {
     const item = new MenuItem(data);
     const saved = await item.save();
     await deleteCache(MENU_CACHE_KEY);
+    if (req.app.locals.io) {
+      req.app.locals.io.emit('REFRESH_MENU');
+    }
     res.status(201).json(saved);
   } catch (err) { res.status(400).json({ message: err.message }); }
 });
@@ -85,6 +91,9 @@ router.put('/:id', requireRole(['admin', 'manager']), async (req, res) => {
     const updated = await MenuItem.findByIdAndUpdate(req.params.id, data, { new: true, runValidators: true });
     if (!updated) return res.status(404).json({ message: 'Item not found' });
     await deleteCache(MENU_CACHE_KEY);
+    if (req.app.locals.io) {
+      req.app.locals.io.emit('REFRESH_MENU');
+    }
     res.json(updated);
   } catch (err) { res.status(400).json({ message: err.message }); }
 });
@@ -95,6 +104,9 @@ router.delete('/:id', requireRole(['admin', 'manager']), async (req, res) => {
     const result = await MenuItem.findByIdAndDelete(req.params.id);
     if (!result) return res.status(404).json({ message: 'Item not found' });
     await deleteCache(MENU_CACHE_KEY);
+    if (req.app.locals.io) {
+      req.app.locals.io.emit('REFRESH_MENU');
+    }
     res.json({ message: 'Deleted successfully' });
   } catch (err) { res.status(500).json({ message: err.message }); }
 });

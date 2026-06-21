@@ -7,7 +7,10 @@ const inventorySchema = new mongoose.Schema({
   stock: { type: Number, required: true, default: 0, min: 0 },
   minStock: { type: Number, required: true, default: 5, min: 0 },
   price: { type: Number, required: true, default: 0, min: 0 },
-  shortcut: { type: String, default: '', lowercase: true, trim: true }
+  shortcut: { type: String, default: '', lowercase: true, trim: true },
+  isAlcoholic: { type: Boolean, default: false },
+  isAlcohol: { type: Boolean, default: false }
 },{ timestamps: true });
 
 module.exports = mongoose.model('Inventory', inventorySchema);
+

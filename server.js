@@ -151,8 +151,34 @@ function setupSocketIO() {
       socket.join(`table:${tableNo}`);
     });
 
+    socket.on('admin-broadcast', async (data) => {
+      console.log('📢 Received admin-broadcast:', data);
+      if (data && data.event) {
+        if (data.event === 'NEW_KOT' && data.kotNo) {
+          try {
+            const KOT = require('./src/models/KOT');
+            const kotDoc = await KOT.findOne({ kotNo: data.kotNo });
+            if (kotDoc) {
+              console.log('🎯 Found KOT from admin-broadcast:', kotDoc.kotNo);
+              io.to('kitchen').emit('NEW_KOT', kotDoc);
+              io.emit('NEW_KOT', kotDoc); // Broadcast globally for print receivers on any tab
+              io.emit('TABLE_SESSION_UPDATED', { tableNo: kotDoc.tableNo });
+            } else {
+              console.warn('⚠️ KOT not found for kotNo:', data.kotNo);
+            }
+          } catch (err) {
+            console.error('❌ Error handling NEW_KOT admin-broadcast:', err.message);
+          }
+        } else {
+          // General broadcast fallback (e.g. REFRESH_MENU, TABLE_SESSION_UPDATED)
+          io.emit(data.event, data);
+        }
+      }
+    });
+
     socket.on('kot-created', (data) => {
       io.to('kitchen').emit('NEW_KOT', data);
+      io.emit('NEW_KOT', data); // Broadcast globally for print receivers on any tab
       io.emit('TABLE_SESSION_UPDATED', { tableNo: data.tableNo });
       console.log('🎫 New KOT broadcast:', data.kotNo);
     });

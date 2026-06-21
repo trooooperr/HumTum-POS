@@ -48,9 +48,19 @@ router.post(
   },
   async (req, res) => {
     try {
-      const { name, category, unit, stock, minStock, price } = req.body;
+      const { name, category, unit, stock, minStock, price, isAlcoholic } = req.body;
       const shortcut = (req.body.shortcut || '').toLowerCase().trim();
-      const invItem = new Inventory({ name, category, unit, stock, minStock, price, shortcut });
+      const invItem = new Inventory({
+        name,
+        category,
+        unit,
+        stock,
+        minStock,
+        price,
+        shortcut,
+        isAlcoholic: !!isAlcoholic,
+        isAlcohol: !!isAlcoholic
+      });
       const savedInv = await invItem.save();
       await MenuItem.findOneAndUpdate(
         { name },
@@ -58,6 +68,11 @@ router.post(
         { upsert: true, new: true, setDefaultsOnInsert: true }
       );
       await deleteCache([INVENTORY_CACHE_KEY, MENU_CACHE_KEY]);
+      if (req.app.locals.io) {
+        req.app.locals.io.emit('REFRESH_MENU');
+        const allInv = await Inventory.find().sort({ category: 1, name: 1 });
+        req.app.locals.io.emit('INVENTORY_UPDATED', { inventory: allInv, timestamp: new Date() });
+      }
       res.status(201).json(savedInv);
     } catch (err) {
       console.error('INVENTORY CREATE ERROR:', err.message);
@@ -80,6 +95,10 @@ router.put(
   },
   async (req, res) => {
     try {
+      if (req.body.isAlcoholic !== undefined) {
+        req.body.isAlcoholic = !!req.body.isAlcoholic;
+        req.body.isAlcohol = !!req.body.isAlcoholic;
+      }
       const updated = await Inventory.findByIdAndUpdate(
         req.params.id,
         req.body,
@@ -98,6 +117,11 @@ router.put(
         { upsert: true, new: true, setDefaultsOnInsert: true }
       );
       await deleteCache([INVENTORY_CACHE_KEY, MENU_CACHE_KEY]);
+      if (req.app.locals.io) {
+        req.app.locals.io.emit('REFRESH_MENU');
+        const allInv = await Inventory.find().sort({ category: 1, name: 1 });
+        req.app.locals.io.emit('INVENTORY_UPDATED', { inventory: allInv, timestamp: new Date() });
+      }
       res.json(updated);
     } catch (err) {
       console.error('INVENTORY UPDATE ERROR:', err.message);
@@ -120,6 +144,11 @@ router.patch('/:id/stock', requireRole(['admin', 'manager']), async (req, res) =
       { available: updated.stock > 0 }
     );
     await deleteCache([INVENTORY_CACHE_KEY, MENU_CACHE_KEY]);
+    if (req.app.locals.io) {
+      req.app.locals.io.emit('REFRESH_MENU');
+      const allInv = await Inventory.find().sort({ category: 1, name: 1 });
+      req.app.locals.io.emit('INVENTORY_UPDATED', { inventory: allInv, timestamp: new Date() });
+    }
     res.json(updated);
   } catch (err) {
     console.error('INVENTORY STOCK UPDATE ERROR:', err.message);
@@ -133,6 +162,11 @@ router.delete('/:id', requireRole(['admin', 'manager']), async (req, res) => {
     const result = await Inventory.findByIdAndDelete(req.params.id);
     if (!result) return res.status(404).json({ message: 'Item not found' });
     await deleteCache([INVENTORY_CACHE_KEY, MENU_CACHE_KEY]);
+    if (req.app.locals.io) {
+      req.app.locals.io.emit('REFRESH_MENU');
+      const allInv = await Inventory.find().sort({ category: 1, name: 1 });
+      req.app.locals.io.emit('INVENTORY_UPDATED', { inventory: allInv, timestamp: new Date() });
+    }
     res.json({ message: 'Item deleted successfully' });
   } catch (err) {
     res.status(500).json({ message: err.message });

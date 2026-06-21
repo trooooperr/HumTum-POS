@@ -123,9 +123,10 @@ export default function InvoiceModal() {
           iframe.style.position = 'fixed';
           iframe.style.right = '0';
           iframe.style.bottom = '0';
-          iframe.style.width = '1px';
-          iframe.style.height = '1px';
-          iframe.style.opacity = '0';
+          iframe.style.width = '10px';
+          iframe.style.height = '10px';
+          iframe.style.opacity = '0.01';
+          iframe.style.zIndex = '-9999';
           iframe.style.pointerEvents = 'none';
           document.body.appendChild(iframe);
         }
@@ -147,7 +148,8 @@ export default function InvoiceModal() {
     };
 
     // QZ Tray local printing
-    if (s.qzTrayEnabled) {
+    const isQzActive = qz && (s.qzTrayEnabled || qz.websocket.isActive());
+    if (isQzActive) {
       try {
         if (!qz.websocket.isActive()) {
           await qz.websocket.connect({ retries: 2, delay: 1 });

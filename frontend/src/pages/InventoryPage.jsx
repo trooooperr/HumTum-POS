@@ -58,8 +58,13 @@ function StockModal({ item, onClose, onSave }) {
   const categories = Array.isArray(settings.inventoryCategories) && settings.inventoryCategories.length > 0
     ? settings.inventoryCategories
     : ['General'];
-  const [form, setForm] = useState(item || {
-    name: '', category: categories[0] || '', unit: 'Bottles', stock: 0, minStock: 5, price: '', shortcut: ''
+  const [form, setForm] = useState(() => {
+    if (item) {
+      return { ...item, isAlcoholic: !!(item.isAlcoholic || item.isAlcohol) };
+    }
+    return {
+      name: '', category: categories[0] || '', unit: 'Bottles', stock: 0, minStock: 5, price: '', shortcut: '', isAlcoholic: false
+    };
   });
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -84,7 +89,8 @@ function StockModal({ item, onClose, onSave }) {
       stock: Number(form.stock) || 0,
       minStock: Number(form.minStock) || 0,
       price: Number(form.price) || 0,
-      shortcut: (form.shortcut || '').toLowerCase().trim()
+      shortcut: (form.shortcut || '').toLowerCase().trim(),
+      isAlcoholic: !!form.isAlcoholic
     };
     setError(null);
     setSaving(true);
@@ -139,6 +145,17 @@ function StockModal({ item, onClose, onSave }) {
         <div className="fgroup">
           <label className="lbl">Price</label>
           <input type="number" value={form.price} onChange={e => set('price', e.target.value)} />
+        </div>
+
+        <div className="fgroup" style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, marginBottom: 12 }}>
+          <input 
+            type="checkbox" 
+            id="isAlcoholic"
+            checked={!!form.isAlcoholic} 
+            onChange={e => set('isAlcoholic', e.target.checked)} 
+            style={{ width: 'auto', margin: 0, cursor: 'pointer' }}
+          />
+          <label htmlFor="isAlcoholic" style={{ margin: 0, cursor: 'pointer', fontSize: 13, fontWeight: 'bold' }}>Alcoholic Item</label>
         </div>
 
         <div className="fgroup">
@@ -357,6 +374,11 @@ export default function InventoryPage() {
                   <div className="invName">{i.name}</div>
                   {i.shortcut && <div className="invShortcutRow">Shortcut: <span className="invShortcut">{i.shortcut}</span></div>}
                   <div className="invMeta">{i.category} • ₹{i.price}</div>
+                  <div style={{ marginTop: 4 }}>
+                    <span className={`badge ${i.isAlcoholic || i.isAlcohol ? 'b-red' : 'b-green'}`} style={{ fontSize: 10 }}>
+                      {i.isAlcoholic || i.isAlcohol ? 'Alcoholic' : 'Non-Alcoholic'}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="invRight">
@@ -404,6 +426,7 @@ export default function InventoryPage() {
                 <th>Category</th>
                 <th>Price</th>
                 <th>Stock</th>
+                <th>Classification</th>
                 <th>Status</th>
                 {isAdmin && <th>Actions</th>}
               </tr>
@@ -419,6 +442,11 @@ export default function InventoryPage() {
                     <td>{i.category}</td>
                     <td>₹{i.price}</td>
                     <td>{i.stock}</td>
+                    <td>
+                      <span className={`badge ${i.isAlcoholic || i.isAlcohol ? 'b-red' : 'b-green'}`}>
+                        {i.isAlcoholic || i.isAlcohol ? 'Alcoholic' : 'Non-Alcoholic'}
+                      </span>
+                    </td>
                     <td><span className={`badge ${s.cls}`}>{s.text}</span></td>
                     {isAdmin && (
                       <td className="action-cell">

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
-import { apiUrl, authFetch } from '../lib/api';
+import { API_BASE, apiUrl, authFetch } from '../lib/api';
 import io from 'socket.io-client';
 
 const qz = typeof window !== 'undefined' ? window.qz : null;
@@ -258,10 +258,15 @@ export function AppProvider({ children }) {
         const uniqueId = 'print-iframe-' + Math.random().toString(36).substring(2, 9);
         const iframe = document.createElement('iframe');
         iframe.id = uniqueId;
-        iframe.style.position = 'absolute';
-        iframe.style.width = '0px';
-        iframe.style.height = '0px';
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '10px';
+        iframe.style.height = '10px';
+        iframe.style.opacity = '0.01';
         iframe.style.border = 'none';
+        iframe.style.zIndex = '-9999';
+        iframe.style.pointerEvents = 'none';
         document.body.appendChild(iframe);
         
         const doc = iframe.contentDocument || iframe.contentWindow.document;
@@ -288,7 +293,8 @@ export function AppProvider({ children }) {
       }
     };
 
-    if (settings.qzTrayEnabled && qz) {
+    const isQzActive = qz && (settings.qzTrayEnabled || qz.websocket.isActive());
+    if (isQzActive) {
       try {
         if (!qz.websocket.isActive()) {
           await qz.websocket.connect({ retries: 2, delay: 1 });
@@ -487,62 +493,7 @@ export function AppProvider({ children }) {
     firePrint(html, 'document', settings.barPrinterName || '');
   }, [settings, firePrint]);
 
-  // ── Socket.IO ────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!currentUser) {
-      if (socket) socket.disconnect();
-      setSocket(null);
-      return;
-    }
-
-    const newSocket = io(window.location.origin, {
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5,
-      transports: ['websocket'], // Force websocket to fix Render disconnect loops
-      auth: {
-        token: localStorage.getItem(TOKEN_KEY),
-      }
-    });
-
-    newSocket.on('connect', () => {
-      console.log('✅ Socket.IO connected');
-    });
-
-    newSocket.on('disconnect', () => {
-      console.log('❌ Socket.IO disconnected');
-    });
-
-    newSocket.on('INVENTORY_UPDATED', (data) => {
-      if (data && data.inventory) {
-        setInventory(data.inventory);
-        setMenuItems(prev => prev.map(item => {
-          const match = data.inventory.find(inv => inv.name?.toLowerCase().trim() === item.name?.toLowerCase().trim());
-          return match ? { ...item, available: match.stock > 0 } : item;
-        }));
-        localStorage.setItem(INVENTORY_CACHE, JSON.stringify(data.inventory));
-      }
-    });
-
-    newSocket.on('TABLE_SESSION_UPDATED', () => {
-      safeFetch(apiUrl('/api/orders/sessions/active')).then(setActiveSessions);
-    });
-
-    newSocket.on('NEW_KOT', (kot) => {
-      playAlarmChime();
-      showToast(`New order placed on Table ${kot.tableNo}!`, 'info');
-      if (kot && kot.items && kot.items.length > 0) {
-        printKOTDocument(kot, kot.tableNo);
-      }
-    });
-
-    setSocket(newSocket);
-
-    return () => {
-      if (newSocket) newSocket.disconnect();
-    };
-  }, [currentUser, printKOTDocument, showToast]);
+  // Socket.IO relocated below loadData definition
 
   // ── Auth helpers ────────────────────────────────────────────────
   const login = useCallback(async (username, password) => {
@@ -647,6 +598,80 @@ export function AppProvider({ children }) {
       isFetching.current = false;
     }
   }, [setMenuItems, setWorkers, setInventory, setSettings]);
+
+  // ── QZ Tray Auto Connect ──────────────────────────────────────────
+  useEffect(() => {
+    if (qz) {
+      const connectQz = async () => {
+        try {
+          if (!qz.websocket.isActive()) {
+            await qz.websocket.connect({ retries: 2, delay: 1 });
+            console.log('✅ Connected to QZ Tray');
+          }
+        } catch (err) {
+          console.warn('⚠️ QZ Tray not running or unable to connect:', err.message);
+        }
+      };
+      connectQz();
+    }
+  }, [settings.qzTrayEnabled]);
+
+  // ── Socket.IO ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!currentUser) {
+      if (socket) socket.disconnect();
+      setSocket(null);
+      return;
+    }
+
+    const newSocket = io(API_BASE, {
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5,
+      transports: ['websocket'], // Force websocket to fix Render disconnect loops
+      auth: {
+        token: localStorage.getItem(TOKEN_KEY),
+      }
+    });
+
+    newSocket.on('connect', () => {
+      console.log('✅ Socket.IO connected');
+    });
+
+    newSocket.on('disconnect', () => {
+      console.log('❌ Socket.IO disconnected');
+    });
+
+    newSocket.on('INVENTORY_UPDATED', (data) => {
+      if (data && data.inventory) {
+        applyInventoryUpdate(data.inventory);
+      }
+    });
+
+    newSocket.on('TABLE_SESSION_UPDATED', () => {
+      safeFetch(apiUrl('/api/orders/sessions/active')).then(setActiveSessions);
+    });
+
+    newSocket.on('NEW_KOT', (kot) => {
+      playAlarmChime();
+      showToast(`New order placed on Table ${kot.tableNo}!`, 'info');
+      if (kot && kot.items && kot.items.length > 0) {
+        printKOTDocument(kot, kot.tableNo);
+      }
+    });
+
+    newSocket.on('REFRESH_MENU', () => {
+      console.log('🔄 REFRESH_MENU received in POS frontend, re-fetching data...');
+      loadData(true);
+    });
+
+    setSocket(newSocket);
+
+    return () => {
+      if (newSocket) newSocket.disconnect();
+    };
+  }, [currentUser, printKOTDocument, showToast, applyInventoryUpdate, loadData]);
 
   const role = (currentUser?.role || 'staff').toLowerCase();
   const can = useCallback((action) => {
