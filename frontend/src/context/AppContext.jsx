@@ -343,16 +343,35 @@ export function AppProvider({ children }) {
   `, []);
 
   const printKOTDocument = useCallback((kot, tableNo) => {
-    const barItems     = (kot.items || []).filter(i => (i.department || 'kitchen') === 'bar');
-    const kitchenItems = (kot.items || []).filter(i => (i.department || 'kitchen') !== 'bar');
+    // Separate items by department explicitly
+    const kitchenItems = [];
+    const barItems = [];
+    (kot.items || []).forEach(item => {
+      const dept = (item.department || 'kitchen').toLowerCase();
+      if (dept === 'bar') {
+        barItems.push(item);
+      } else {
+        kitchenItems.push(item);
+      }
+    });
 
+    // Print kitchen KOT first (if any)
     if (kitchenItems.length > 0) {
-      firePrint(buildKOTHtml(kot, tableNo, kitchenItems, settings.kitchenPrinterName || 'KITCHEN'), 'document', settings.kitchenPrinterName || '');
+      firePrint(
+        buildKOTHtml(kot, tableNo, kitchenItems, settings.kitchenPrinterName || 'KITCHEN'),
+        'document',
+        settings.kitchenPrinterName || ''
+      );
     }
 
+    // Print bar KOT (if any) after a short delay to avoid iframe race
     if (barItems.length > 0) {
       setTimeout(() => {
-        firePrint(buildKOTHtml(kot, tableNo, barItems, settings.barPrinterName || 'BAR'), 'document', settings.barPrinterName || '');
+        firePrint(
+          buildKOTHtml(kot, tableNo, barItems, settings.barPrinterName || 'BAR'),
+          'document',
+          settings.barPrinterName || ''
+        );
       }, 600);
     }
   }, [settings, firePrint, buildKOTHtml]);
