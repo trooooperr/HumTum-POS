@@ -19,7 +19,7 @@ function TableTile({ id, status, num, total, items, currency, onClick, isVip }) 
   const isOccupied = status === 'occupied';
   const isDue = status === 'due';
   const isFree = !isOccupied && !isDue;
-  const statusLabel = isOccupied ? 'Active' : isDue ? 'Due' : 'Free';
+  const statusLabel = isOccupied || isDue ? 'Busy' : 'Free';
 
   return (
     <button
@@ -68,7 +68,28 @@ function MenuItem({ item, qty, add, rem, stock, minStock }) {
         )}
       </div>
       <div className="mbody-modern">
-        <div className="mname-modern">{item.name}</div>
+        <div className="mname-modern" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {item.department !== 'bar' && (
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 14,
+              height: 14,
+              border: `1px solid ${item.isVeg !== false ? '#28a745' : '#dc3545'}`,
+              padding: 2,
+              flexShrink: 0
+            }}>
+              <span style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                backgroundColor: item.isVeg !== false ? '#28a745' : '#dc3545'
+              }} />
+            </span>
+          )}
+          <span>{item.name}</span>
+        </div>
         {item.available && (
           <div className="mctrl-modern">
             <button className="qbtn-m" onClick={() => rem(String(item._id), 'decrease')}>−</button>

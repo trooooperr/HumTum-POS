@@ -259,6 +259,9 @@ async function startServer() {
 
     setupSocketIO();
 
+    // Watch collections and broadcast socket updates on DB changes
+    setupDbChangeStreams(io);
+
     server.once('error', async (err) => {
       if (err.code === 'EADDRINUSE') {
         console.error(`❌ Port ${PORT} is already in use.`);
@@ -278,6 +281,55 @@ async function startServer() {
   } catch (err) {
     console.error('❌ Server startup failed:', err.message);
     await gracefulShutdown('STARTUP_FAILURE');
+  }
+}
+
+function setupDbChangeStreams(io) {
+  try {
+    const db = mongoose.connection.db;
+
+    // Watch tablesessions collection
+    const sessionStream = db.collection('tablesessions').watch([], { fullDocument: 'updateLookup' });
+    sessionStream.on('change', (change) => {
+      const doc = change.fullDocument;
+      if (doc && doc.tableNo) {
+        io.emit('TABLE_SESSION_UPDATED', { tableNo: doc.tableNo });
+        io.to(`table:${doc.tableNo}`).emit('TABLE_UPDATED', doc);
+      } else if (change.operationType === 'delete') {
+        io.emit('TABLE_SESSION_UPDATED', {});
+      }
+    });
+
+    // Watch kots collection
+    const kotStream = db.collection('kots').watch([], { fullDocument: 'updateLookup' });
+    kotStream.on('change', (change) => {
+      if (change.operationType === 'insert') {
+        const doc = change.fullDocument;
+        if (doc) {
+          io.to('kitchen').emit('NEW_KOT', doc);
+          io.emit('TABLE_SESSION_UPDATED', { tableNo: doc.tableNo });
+          console.log('🎫 Change Stream: New KOT broadcast:', doc.kotNo);
+        }
+      }
+    });
+
+    // Watch menuitems collection
+    const menuStream = db.collection('menuitems').watch([], { fullDocument: 'updateLookup' });
+    menuStream.on('change', (change) => {
+      console.log('🍔 Change Stream: menuitems collection changed, broadcasting REFRESH_MENU');
+      io.emit('REFRESH_MENU');
+    });
+
+    // Watch inventories collection
+    const invStream = db.collection('inventories').watch([], { fullDocument: 'updateLookup' });
+    invStream.on('change', (change) => {
+      console.log('🍻 Change Stream: inventories collection changed, broadcasting REFRESH_MENU');
+      io.emit('REFRESH_MENU');
+    });
+
+    console.log('✅ MongoDB Change Streams initialized for real-time synchronization');
+  } catch (err) {
+    console.error('❌ Failed to initialize MongoDB Change Streams:', err.message);
   }
 }
 

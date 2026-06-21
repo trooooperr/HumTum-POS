@@ -193,7 +193,31 @@ export default function MenuPage() {
                   <div className="sold-out-badge">SOLD OUT</div>
                 )}
                 <div className="menu-card-top">
-                  <div><div className="menu-item-name">{item.name}</div><span className="badge-mini">{item.category}</span></div>
+                  <div>
+                    <div className="menu-item-name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {item.department !== 'bar' && (
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: 14,
+                          height: 14,
+                          border: `1px solid ${item.isVeg !== false ? '#28a745' : '#dc3545'}`,
+                          padding: 2,
+                          flexShrink: 0
+                        }}>
+                          <span style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: '50%',
+                            backgroundColor: item.isVeg !== false ? '#28a745' : '#dc3545'
+                          }} />
+                        </span>
+                      )}
+                      <span>{item.name}</span>
+                    </div>
+                    <span className="badge-mini">{item.category}</span>
+                  </div>
                   <div className="menu-item-price">₹{item.price.toFixed(0)}</div>
                 </div>
                 <div className="menu-card-bottom">
@@ -222,7 +246,30 @@ export default function MenuPage() {
             <tbody>
               {filtered.map(item => (
                 <tr key={item._id}>
-                  <td style={{ fontWeight: 600 }}>{item.name}</td>
+                  <td style={{ fontWeight: 600 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {item.department !== 'bar' && (
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: 14,
+                          height: 14,
+                          border: `1px solid ${item.isVeg !== false ? '#28a745' : '#dc3545'}`,
+                          padding: 2,
+                          flexShrink: 0
+                        }}>
+                          <span style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: '50%',
+                            backgroundColor: item.isVeg !== false ? '#28a745' : '#dc3545'
+                          }} />
+                        </span>
+                      )}
+                      <span>{item.name}</span>
+                    </div>
+                  </td>
                   <td><span className="badge">{item.category}</span></td>
                   <td style={{ textAlign: 'right', fontWeight: 800 }}>₹{item.price.toFixed(2)}</td>
                   <td style={{ textAlign: 'center' }}><span className="menu-shortcut">{item.shortcut || '—'}</span></td>
