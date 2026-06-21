@@ -255,16 +255,14 @@ export function AppProvider({ children }) {
   const firePrint = useCallback(async (html, documentType = 'document', printerName = '') => {
     const runBrowserPrint = () => {
       try {
-        let iframe = document.getElementById('print-iframe');
-        if (!iframe) {
-          iframe = document.createElement('iframe');
-          iframe.id = 'print-iframe';
-          iframe.style.position = 'absolute';
-          iframe.style.width = '0px';
-          iframe.style.height = '0px';
-          iframe.style.border = 'none';
-          document.body.appendChild(iframe);
-        }
+        const uniqueId = 'print-iframe-' + Math.random().toString(36).substring(2, 9);
+        const iframe = document.createElement('iframe');
+        iframe.id = uniqueId;
+        iframe.style.position = 'absolute';
+        iframe.style.width = '0px';
+        iframe.style.height = '0px';
+        iframe.style.border = 'none';
+        document.body.appendChild(iframe);
         
         const doc = iframe.contentDocument || iframe.contentWindow.document;
         doc.open();
@@ -272,8 +270,17 @@ export function AppProvider({ children }) {
         doc.close();
         
         setTimeout(() => {
-          iframe.contentWindow.focus();
-          iframe.contentWindow.print();
+          try {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+            setTimeout(() => {
+              try {
+                document.body.removeChild(iframe);
+              } catch (e) {}
+            }, 60000);
+          } catch (err) {
+            console.error('Focus/print failed:', err);
+          }
         }, 1000);
       } catch (printErr) {
         console.error('Browser print failed:', printErr);
