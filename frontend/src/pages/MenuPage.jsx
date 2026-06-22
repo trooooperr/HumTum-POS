@@ -12,7 +12,7 @@ function ItemModal({ item, onClose, onSave }) {
     : ['General'];
   const [form, setForm] = useState({
     name: item?.name || '',
-    category: '',
+    category: item?.category || 'All',
     price: item?.price || '',
     department: item?.department || 'kitchen',
     imageUrl: item?.imageUrl || '',
@@ -47,6 +47,7 @@ function ItemModal({ item, onClose, onSave }) {
         <div className="frow2">
           <div className="fgroup"><label className="lbl">Category</label>
             <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
+              <option value="All">All</option>
               {menuCategories.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>

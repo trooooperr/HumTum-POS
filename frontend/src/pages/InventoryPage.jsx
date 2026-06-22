@@ -63,7 +63,7 @@ function StockModal({ item, onClose, onSave }) {
       return { ...item, isAlcoholic: !!(item.isAlcoholic || item.isAlcohol) };
     }
     return {
-      name: '', category: '', unit: 'Bottles', stock: 0, minStock: 5, price: '', shortcut: '', isAlcoholic: false
+      name: '', category: 'All', unit: 'Bottles', stock: 0, minStock: 5, price: '', shortcut: '', isAlcoholic: false
     };
   });
   const [error, setError] = useState(null);
@@ -72,7 +72,7 @@ function StockModal({ item, onClose, onSave }) {
   // If categories change and no category selected, set default
   useEffect(() => {
     if (!form.category && categories.length > 0) {
-      setForm(f => ({ ...f, category: categories[0] }));
+      setForm(f => ({ ...f, category: 'All' }));
     }
   }, [categories]);
 
@@ -130,6 +130,7 @@ function StockModal({ item, onClose, onSave }) {
           <div className="fgroup">
             <label className="lbl">Category</label>
             <select value={form.category} onChange={e => set('category', e.target.value)}>
+              <option value="All">All</option>
               {categories.map(c => <option key={c}>{c}</option>)}
             </select>
           </div>
