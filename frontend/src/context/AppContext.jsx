@@ -748,7 +748,8 @@ export function AppProvider({ children }) {
       const mc = categoryFilter === 'All' || item.category === categoryFilter;
       const query = menuSearch.toLowerCase();
       const ms = item.name.toLowerCase().includes(query) || (item.shortcut || '').toLowerCase().includes(query);
-      return mc && ms;
+      // Exclude inventory items from the menu list
+      return mc && ms && !item.isInventory;
     });
   }, [allSellableItems, categoryFilter, menuSearch]);
 
