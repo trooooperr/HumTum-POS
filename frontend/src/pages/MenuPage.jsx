@@ -110,7 +110,7 @@ function ItemModal({ item, onClose, onSave }) {
 }
 
 export default function MenuPage() {
-  const { menuItems, saveMenuItem, deleteMenuItem, settings } = useApp();
+  const { menuItems, saveMenuItem, deleteMenuItem, settings, inventory } = useApp();
   const menuCategories = Array.isArray(settings.menuCategories) && settings.menuCategories.length > 0
     ? settings.menuCategories
     : ['General'];
@@ -120,12 +120,14 @@ export default function MenuPage() {
   const [confirmDel, setConfirmDel] = useState(null); // stores ID of item being deleted
 
   const filtered = useMemo(() => {
+    const invNames = new Set((inventory || []).map(inv => (inv.name || '').toLowerCase().trim()));
     return menuItems.filter(i => {
+      if (invNames.has((i.name || '').toLowerCase().trim())) return false;
       const ms = i.name.toLowerCase().includes(search.toLowerCase());
       const mc = catFilter === 'All' || i.category === catFilter;
       return ms && mc;
     });
-  }, [menuItems, search, catFilter]);
+  }, [menuItems, inventory, search, catFilter]);
 
   const cats = ['All', ...menuCategories];
 
