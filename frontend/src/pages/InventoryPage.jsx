@@ -313,22 +313,7 @@ export default function InventoryPage() {
             </select>
           </div>
         </div>
-        <div
-          className="date-group-unified"
-          style={{ display: 'flex', alignItems: 'flex-end', gap: 4, position: 'relative' }}
-        >
-          <div style={{ flex: 1 }}>
-            <DateField label="From" value={startDate} onChange={e => setStartDate(e.target.value)} inputRef={startInputRef} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <DateField label="To" value={endDate} onChange={e => setEndDate(e.target.value)} inputRef={endInputRef} />
-          </div>
-          {(startDate || endDate || search) && (
-            <button className="clear-filter-btn" onClick={clearFilters} title="Clear filters">
-              <X size={14} />
-            </button>
-          )}
-        </div>
+
         {isAdmin && (
           <button
             className="btn btn-primary search-add-btn mobile-fab-btn"
