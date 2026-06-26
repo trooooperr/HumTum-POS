@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { Save, Check, Send, KeyRound, ShieldAlert, Users, Trash2, RefreshCw } from 'lucide-react';
 import { apiUrl, authFetch } from '../lib/api';
 export default function SettingsPage() {
-  const { settings, setSettings, saveSettings, currentUser, orderHistory, workers, loadData } = useApp();
+  const { settings, setSettings, saveSettings, currentUser, orderHistory, workers, loadData, qzConnected, qzPrinters, fetchQzPrinters } = useApp();
   const [form, setForm] = useState({ ...settings });
   const [saved, setSaved] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -13,6 +13,27 @@ export default function SettingsPage() {
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState(null);
   const { showToast } = useApp();
+  const [fetchingPrinters, setFetchingPrinters] = useState(false);
+
+  const handleDetectPrinters = async () => {
+    setFetchingPrinters(true);
+    try {
+      await fetchQzPrinters();
+      showToast('Printers detected successfully', 'success');
+    } catch {
+      showToast('Failed to detect printers', 'error');
+    } finally {
+      setFetchingPrinters(false);
+    }
+  };
+
+  // Sync form states with loaded settings
+  useEffect(() => {
+    if (settings) {
+      setForm({ ...settings });
+      setEmail({ adminEmail: settings.adminEmail || '' });
+    }
+  }, [settings]);
 
   // STAFF MANAGEMENT (RESET PASSWORDS)
   const [selectedStaffId, setSelectedStaffId] = useState('');
@@ -299,21 +320,76 @@ export default function SettingsPage() {
               <h2>Printing</h2>
               <p>Configure local receipt and KOT routing via QZ Tray.</p>
             </div>
+            {form.qzTrayEnabled && (
+              <div className={`qz-status-badge ${qzConnected ? 'connected' : 'disconnected'}`}>
+                <div className="qz-status-dot" />
+                <span>{qzConnected ? 'QZ Connected' : 'QZ Disconnected'}</span>
+              </div>
+            )}
           </div>
           <div className="settings-printing-row" style={{ marginTop: '14px' }}>
             <label className="settings-toggle" style={{ margin: 0 }}>
-              <input type="checkbox" checked={!!form.qzTrayEnabled} onChange={e => set('qzTrayEnabled', e.target.checked)} />
+              <input type="checkbox" checked={!!form.qzTrayEnabled} onChange={e => {
+                const checked = e.target.checked;
+                set('qzTrayEnabled', checked);
+                set('directPrinting', checked);
+              }} />
               <span>Use QZ Tray for Local Printing</span>
             </label>
-            <div className="settings-field" style={{ flex: 1, minWidth: '200px' }}>
-              <label>Kitchen Printer (System Name)</label>
-              <input value={form.kitchenPrinterName || ''} onChange={e => set('kitchenPrinterName', e.target.value)} placeholder="e.g. KITCHEN_PRINTER" />
-            </div>
-            <div className="settings-field" style={{ flex: 1, minWidth: '200px' }}>
-              <label>Bar & Bill Printer (System Name)</label>
-              <input value={form.barPrinterName || ''} onChange={e => set('barPrinterName', e.target.value)} placeholder="e.g. BAR_PRINTER" />
-            </div>
           </div>
+
+          {form.qzTrayEnabled && (
+            <div style={{ marginTop: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleDetectPrinters}
+                  disabled={fetchingPrinters}
+                  style={{ fontSize: '12px', padding: '6px 14px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <RefreshCw size={13} style={{ animation: fetchingPrinters ? 'spin 1s linear infinite' : 'none' }} />
+                  {fetchingPrinters ? 'Detecting...' : 'Detect Printers'}
+                </button>
+                {qzPrinters.length > 0 && (
+                  <span style={{ fontSize: '11px', color: '#8b949e' }}>{qzPrinters.length} printer(s) found</span>
+                )}
+              </div>
+
+              <div className="settings-printing-row">
+                <div className="settings-field" style={{ flex: 1, minWidth: '200px' }}>
+                  <label>Kitchen Printer</label>
+                  {qzPrinters.length > 0 ? (
+                    <select
+                      value={form.kitchenPrinterName || ''}
+                      onChange={e => set('kitchenPrinterName', e.target.value)}
+                      style={{ padding: '8px', borderRadius: '8px', border: '1px solid var(--b1)', background: 'var(--s2)', color: 'var(--t0)' }}
+                    >
+                      <option value="">-- Select Printer --</option>
+                      {qzPrinters.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  ) : (
+                    <input value={form.kitchenPrinterName || ''} onChange={e => set('kitchenPrinterName', e.target.value)} placeholder="e.g. KITCHEN_PRINTER" />
+                  )}
+                </div>
+                <div className="settings-field" style={{ flex: 1, minWidth: '200px' }}>
+                  <label>Bar & Bill Printer</label>
+                  {qzPrinters.length > 0 ? (
+                    <select
+                      value={form.barPrinterName || ''}
+                      onChange={e => set('barPrinterName', e.target.value)}
+                      style={{ padding: '8px', borderRadius: '8px', border: '1px solid var(--b1)', background: 'var(--s2)', color: 'var(--t0)' }}
+                    >
+                      <option value="">-- Select Printer --</option>
+                      {qzPrinters.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  ) : (
+                    <input value={form.barPrinterName || ''} onChange={e => set('barPrinterName', e.target.value)} placeholder="e.g. BAR_PRINTER" />
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </section>
 
         <section className="settings-card settings-full">

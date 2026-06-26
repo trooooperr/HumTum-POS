@@ -244,6 +244,10 @@ export function AppProvider({ children }) {
   const [menuSearch,      setMenuSearch]      = useState('');
   const [invoiceOrder,    setInvoiceOrder]    = useState(null);
   
+  // ── QZ Tray State ───────────────────────────────────────────────
+  const [qzConnected, setQzConnected] = useState(false);
+  const [qzPrinters, setQzPrinters] = useState([]);
+
   // ── Notifications ───────────────────────────────────────────────
   const [toast, setToast] = useState(null); // { msg, type }
   const showToast = useCallback((msg, type = 'success') => {
@@ -304,7 +308,7 @@ export function AppProvider({ children }) {
 
         // Configure digital signature backend handler
         qz.security.setSignaturePromise((toSign) => {
-          return (resolve, reject) => {
+          return new Promise((resolve, reject) => {
             authFetch(apiUrl('/api/qz/sign'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -313,7 +317,7 @@ export function AppProvider({ children }) {
               .then(res => res.text())
               .then(resolve)
               .catch(reject);
-          };
+          });
         });
 
         if (!qz.websocket.isActive()) {
@@ -620,6 +624,41 @@ export function AppProvider({ children }) {
   }, [setMenuItems, setWorkers, setInventory, setSettings]);
 
   // ── QZ Tray Auto Connect ──────────────────────────────────────────
+  const fetchQzPrinters = useCallback(async () => {
+    if (!qz) return [];
+    try {
+      if (!qz.websocket.isActive()) {
+        // Configure security before connecting
+        qz.security.setCertificatePromise(() => {
+          return authFetch(apiUrl('/api/qz/certificate'))
+            .then(res => res.text());
+        });
+        qz.security.setSignaturePromise((toSign) => {
+          return new Promise((resolve, reject) => {
+            authFetch(apiUrl('/api/qz/sign'), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ toSign })
+            })
+              .then(res => res.text())
+              .then(resolve)
+              .catch(reject);
+          });
+        });
+        await qz.websocket.connect({ retries: 2, delay: 1 });
+      }
+      const printers = await qz.printers.find();
+      setQzPrinters(Array.isArray(printers) ? printers : []);
+      setQzConnected(true);
+      return printers;
+    } catch (err) {
+      console.warn('⚠️ Failed to fetch printers:', err.message);
+      setQzConnected(false);
+      setQzPrinters([]);
+      return [];
+    }
+  }, []);
+
   useEffect(() => {
     if (qz && currentUser && settings.qzTrayEnabled) {
       // Configure digital certificate and signature globally on load
@@ -629,7 +668,7 @@ export function AppProvider({ children }) {
       });
 
       qz.security.setSignaturePromise((toSign) => {
-        return (resolve, reject) => {
+        return new Promise((resolve, reject) => {
           authFetch(apiUrl('/api/qz/sign'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -638,20 +677,31 @@ export function AppProvider({ children }) {
             .then(res => res.text())
             .then(resolve)
             .catch(reject);
-        };
+        });
       });
 
       const connectQz = async () => {
         try {
           if (!qz.websocket.isActive()) {
-            await qz.websocket.connect({ retries: 2, delay: 1 });
-            console.log('✅ Connected to QZ Tray');
+            await qz.websocket.connect({ retries: 3, delay: 1 });
+          }
+          console.log('✅ Connected to QZ Tray');
+          setQzConnected(true);
+          // Auto-fetch printers on successful connect
+          try {
+            const printers = await qz.printers.find();
+            setQzPrinters(Array.isArray(printers) ? printers : []);
+          } catch (e) {
+            console.warn('Could not list printers:', e.message);
           }
         } catch (err) {
           console.warn('⚠️ QZ Tray not running or unable to connect:', err.message);
+          setQzConnected(false);
         }
       };
       connectQz();
+    } else {
+      setQzConnected(false);
     }
   }, [currentUser, settings.qzTrayEnabled]);
 
@@ -1244,6 +1294,8 @@ export function AppProvider({ children }) {
       saveWorker, deleteWorker, updateWorkerStatus,
       toast, showToast,
       NUM_TABLES,
+      // QZ Tray
+      qzConnected, qzPrinters, fetchQzPrinters,
       // Socket.IO & KOT functions
       socket,
       kotSessions, currentSession, kots,

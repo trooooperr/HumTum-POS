@@ -5,7 +5,26 @@ const rawBase = import.meta.env.VITE_API_URL || '';
 const useLocationOrigin = !rawBase || 
   (rawBase.includes('localhost') && !window.location.hostname.includes('localhost'));
 
-export const API_BASE = (useLocationOrigin ? window.location.origin : rawBase).replace(/\/$/, '');
+let resolvedBase = rawBase;
+if (useLocationOrigin) {
+  try {
+    const rawUrl = new URL(rawBase || window.location.origin);
+    const resolvedUrl = new URL(window.location.origin);
+    const isLocalIpOrHost = 
+      /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(window.location.hostname) ||
+      window.location.hostname === 'localhost' ||
+      window.location.hostname.endsWith('.local');
+      
+    if (isLocalIpOrHost && rawUrl.port) {
+      resolvedUrl.port = rawUrl.port;
+    }
+    resolvedBase = resolvedUrl.origin;
+  } catch (e) {
+    resolvedBase = window.location.origin;
+  }
+}
+
+export const API_BASE = resolvedBase.replace(/\/$/, '');
 
 export function apiUrl(path) {
   if (!path.startsWith('/')) {

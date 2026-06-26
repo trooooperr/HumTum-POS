@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { X, Printer, Phone, Send, Check, Download, Share2 } from 'lucide-react';
 import { apiUrl, authFetch } from '../lib/api';
-import * as qz from 'qz-tray';
+const qz = typeof window !== 'undefined' ? window.qz : null;
 
 export default function InvoiceModal() {
   const { invoiceOrder, setInvoiceOrder, settings, showToast } = useApp();
@@ -159,7 +159,7 @@ export default function InvoiceModal() {
 
         // Configure digital signature backend handler (Must be set every time)
         qz.security.setSignaturePromise((toSign) => {
-          return (resolve, reject) => {
+          return new Promise((resolve, reject) => {
             authFetch(apiUrl('/api/qz/sign'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -168,7 +168,7 @@ export default function InvoiceModal() {
               .then(res => res.text())
               .then(resolve)
               .catch(reject);
-          };
+          });
         });
 
         if (!qz.websocket.isActive()) {
