@@ -141,27 +141,26 @@ export default function SettingsPage() {
     setEmail({ adminEmail: settings.adminEmail || '' });
   }, [settings]);
 
-  // Helper to reorder a list
-  const reorder = (list, startIndex, endIndex) => {
-    const result = Array.from(list);
-    const [removed] = result.splice(startIndex, 1);
-    result.splice(endIndex, 0, removed);
-    return result;
+  const handleShiftMenuCategory = (index, direction) => {
+    const newCats = [...menuCategories];
+    if (direction === 'left' && index > 0) {
+      [newCats[index - 1], newCats[index]] = [newCats[index], newCats[index - 1]];
+    } else if (direction === 'right' && index < newCats.length - 1) {
+      [newCats[index + 1], newCats[index]] = [newCats[index], newCats[index + 1]];
+    }
+    setForm(f => ({ ...f, menuCategories: newCats }));
+    setSettings(s => ({ ...s, menuCategories: newCats }));
   };
 
-  const onDragEnd = (result) => {
-    const { source, destination } = result;
-    if (!destination) return;
-    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
-    if (source.droppableId === 'menuCategories') {
-      const newOrder = reorder(menuCategories, source.index, destination.index);
-      setForm({ ...form, menuCategories: newOrder });
-      setSettings({ ...settings, menuCategories: newOrder });
-    } else if (source.droppableId === 'inventoryCategories') {
-      const newOrder = reorder(invCategories, source.index, destination.index);
-      setForm({ ...form, inventoryCategories: newOrder });
-      setSettings({ ...settings, inventoryCategories: newOrder });
+  const handleShiftInvCategory = (index, direction) => {
+    const newCats = [...invCategories];
+    if (direction === 'left' && index > 0) {
+      [newCats[index - 1], newCats[index]] = [newCats[index], newCats[index - 1]];
+    } else if (direction === 'right' && index < newCats.length - 1) {
+      [newCats[index + 1], newCats[index]] = [newCats[index], newCats[index + 1]];
     }
+    setForm(f => ({ ...f, inventoryCategories: newCats }));
+    setSettings(s => ({ ...s, inventoryCategories: newCats }));
   };
 
 
@@ -428,46 +427,21 @@ export default function SettingsPage() {
             <button className="btn btn-primary" onClick={handleAddMenuCategory}>Add</button>
           </div>
           {menuCatError && <div className="settings-error">{menuCatError}</div>}
-          <DragDropContext onDragEnd={onDragEnd}>
-            <Droppable droppableId="menuCategories" direction="vertical">
-              {(provided) => (
-                <div className="category-drag-list" ref={provided.innerRef} {...provided.droppableProps}>
-                  {menuCategories.map((cat, index) => (
-                    <Draggable key={cat} draggableId={cat} index={index}>
-                      {(provided) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          className="category-drag-row"
-                          style={{
-                            ...provided.draggableProps.style,
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div {...provided.dragHandleProps} className="drag-handle" title="Drag to reorder">
-                              <GripVertical size={16} />
-                            </div>
-                            <span style={{ fontWeight: 600 }}>{cat}</span>
-                          </div>
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-sm"
-                            style={{ padding: '4px', color: 'var(--red)', background: 'transparent', border: 'none' }}
-                            onClick={() => handleRemoveMenuCategory(cat)}
-                            aria-label={`Remove ${cat}`}
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      )}
-                    </Draggable>
-                  ))}
-                  {provided.placeholder}
-                  {menuCategories.length === 0 && <div className="settings-empty">No menu categories yet.</div>}
-                </div>
-              )}
-            </Droppable>
-          </DragDropContext>
+          <div className="category-chips-inline">
+            {menuCategories.map((cat, index) => (
+              <div key={cat} className="category-chip-inline">
+                {index > 0 && (
+                  <button type="button" className="arrow-btn" onClick={() => handleShiftMenuCategory(index, 'left')} title="Move left">◀</button>
+                )}
+                <span className="cat-name">{cat}</span>
+                {index < menuCategories.length - 1 && (
+                  <button type="button" className="arrow-btn" onClick={() => handleShiftMenuCategory(index, 'right')} title="Move right">▶</button>
+                )}
+                <button type="button" className="delete-btn" onClick={() => handleRemoveMenuCategory(cat)} title="Remove category">×</button>
+              </div>
+            ))}
+            {menuCategories.length === 0 && <div className="settings-empty">No menu categories yet.</div>}
+          </div>
         </section>
 
         <section className="settings-card settings-full">
@@ -482,46 +456,21 @@ export default function SettingsPage() {
             <button className="btn btn-primary" onClick={handleAddInvCategory}>Add</button>
           </div>
           {invCatError && <div className="settings-error">{invCatError}</div>}
-          <DragDropContext onDragEnd={onDragEnd}>
-            <Droppable droppableId="inventoryCategories" direction="vertical">
-              {(provided) => (
-                <div className="category-drag-list" ref={provided.innerRef} {...provided.droppableProps}>
-                  {invCategories.map((cat, index) => (
-                    <Draggable key={cat} draggableId={cat} index={index}>
-                      {(provided) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          className="category-drag-row"
-                          style={{
-                            ...provided.draggableProps.style,
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div {...provided.dragHandleProps} className="drag-handle" title="Drag to reorder">
-                              <GripVertical size={16} />
-                            </div>
-                            <span style={{ fontWeight: 600 }}>{cat}</span>
-                          </div>
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-sm"
-                            style={{ padding: '4px', color: 'var(--red)', background: 'transparent', border: 'none' }}
-                            onClick={() => handleRemoveInvCategory(cat)}
-                            aria-label={`Remove ${cat}`}
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      )}
-                    </Draggable>
-                  ))}
-                  {provided.placeholder}
-                  {invCategories.length === 0 && <div className="settings-empty">No inventory categories yet.</div>}
-                </div>
-              )}
-            </Droppable>
-          </DragDropContext>
+          <div className="category-chips-inline">
+            {invCategories.map((cat, index) => (
+              <div key={cat} className="category-chip-inline">
+                {index > 0 && (
+                  <button type="button" className="arrow-btn" onClick={() => handleShiftInvCategory(index, 'left')} title="Move left">◀</button>
+                )}
+                <span className="cat-name">{cat}</span>
+                {index < invCategories.length - 1 && (
+                  <button type="button" className="arrow-btn" onClick={() => handleShiftInvCategory(index, 'right')} title="Move right">▶</button>
+                )}
+                <button type="button" className="delete-btn" onClick={() => handleRemoveInvCategory(cat)} title="Remove category">×</button>
+              </div>
+            ))}
+            {invCategories.length === 0 && <div className="settings-empty">No inventory categories yet.</div>}
+          </div>
         </section>
 
         <section className="settings-card settings-full">

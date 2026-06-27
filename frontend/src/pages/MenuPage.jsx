@@ -151,6 +151,20 @@ export default function MenuPage() {
     reorderMenuItems(orderedIds);
   };
 
+  const handleShiftItem = async (index, direction) => {
+    if (direction === 'up' && index > 0) {
+      const newItems = [...filtered];
+      [newItems[index - 1], newItems[index]] = [newItems[index], newItems[index - 1]];
+      const orderedIds = newItems.map(item => item._id);
+      reorderMenuItems(orderedIds);
+    } else if (direction === 'down' && index < filtered.length - 1) {
+      const newItems = [...filtered];
+      [newItems[index + 1], newItems[index]] = [newItems[index], newItems[index + 1]];
+      const orderedIds = newItems.map(item => item._id);
+      reorderMenuItems(orderedIds);
+    }
+  };
+
   return (
     <div className="fi fade-in">
 
@@ -263,7 +277,11 @@ export default function MenuPage() {
                                 <input type="checkbox" checked={item.available} onChange={e => saveMenuItem({ available: e.target.checked }, item._id)} />
                                 <span className="slider round"></span>
                               </label>
-                              <div style={{ display: 'flex', gap: 10 }}>
+                              <div style={{ display: 'flex', gap: 4, marginLeft: 12 }}>
+                                <button className="iBtn-round" disabled={index === 0 || !!search} onClick={() => handleShiftItem(index, 'up')} title="Move up" style={{ fontSize: 10, cursor: index === 0 || !!search ? 'not-allowed' : 'pointer', opacity: (index === 0 || !!search) ? 0.3 : 1 }}>▲</button>
+                                <button className="iBtn-round" disabled={index === filtered.length - 1 || !!search} onClick={() => handleShiftItem(index, 'down')} title="Move down" style={{ fontSize: 10, cursor: index === filtered.length - 1 || !!search ? 'not-allowed' : 'pointer', opacity: (index === filtered.length - 1 || !!search) ? 0.3 : 1 }}>▼</button>
+                              </div>
+                              <div style={{ display: 'flex', gap: 10, marginLeft: 'auto' }}>
                                 <button className="iBtn-round edit" onClick={() => setModal(item)}><Pencil size={12} /></button>
                                 <button className="iBtn-round del" onClick={() => setConfirmDel(item._id)}><Trash2 size={12} /></button>
                               </div>
@@ -345,7 +363,10 @@ export default function MenuPage() {
                                   <button className="confirm-n" onClick={() => setConfirmDel(null)}>Cancel</button>
                                 </div>
                               ) : (
-                                <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                                <div style={{ display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center' }}>
+                                  <button className="iBtn" disabled={index === 0 || !!search} onClick={() => handleShiftItem(index, 'up')} title="Move up" style={{ opacity: (index === 0 || !!search) ? 0.3 : 1 }}>▲</button>
+                                  <button className="iBtn" disabled={index === filtered.length - 1 || !!search} onClick={() => handleShiftItem(index, 'down')} title="Move down" style={{ opacity: (index === filtered.length - 1 || !!search) ? 0.3 : 1 }}>▼</button>
+                                  <span style={{ color: 'var(--b1)', margin: '0 2px' }}>|</span>
                                   <button className="iBtn" onClick={() => setModal(item)}><Pencil size={13} /></button>
                                   <button className="iBtn" style={{ color: 'var(--red)' }} onClick={() => setConfirmDel(item._id)}><Trash2 size={13} /></button>
                                 </div>
