@@ -1,4 +1,5 @@
-const rawBase = import.meta.env.VITE_API_URL || '';
+const rawBaseProd = import.meta.env.VITE_API_URL_PROD || '';
+const rawBase = import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'production' ? rawBaseProd : '');
 
 // SAFETY: If VITE_API_URL is accidentally set to localhost BUT we are on a real domain (like Render),
 // ignore the localhost setting and use the current window origin instead.
