@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { Save, Check, Send, KeyRound, ShieldAlert, Users, Trash2, RefreshCw } from 'lucide-react';
 import { apiUrl, authFetch } from '../lib/api';
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 export default function SettingsPage() {
   const { settings, setSettings, saveSettings, currentUser, orderHistory, workers, loadData, qzConnected, qzPrinters, fetchQzPrinters } = useApp();
   const [form, setForm] = useState({ ...settings });
@@ -139,6 +140,29 @@ export default function SettingsPage() {
     setForm({ ...settings });
     setEmail({ adminEmail: settings.adminEmail || '' });
   }, [settings]);
+
+  // Helper to reorder a list
+  const reorder = (list, startIndex, endIndex) => {
+    const result = Array.from(list);
+    const [removed] = result.splice(startIndex, 1);
+    result.splice(endIndex, 0, removed);
+    return result;
+  };
+
+  const onDragEnd = (result) => {
+    const { source, destination } = result;
+    if (!destination) return;
+    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+    if (source.droppableId === 'menuCategories') {
+      const newOrder = reorder(menuCategories, source.index, destination.index);
+      setForm({ ...form, menuCategories: newOrder });
+      setSettings({ ...settings, menuCategories: newOrder });
+    } else if (source.droppableId === 'inventoryCategories') {
+      const newOrder = reorder(invCategories, source.index, destination.index);
+      setForm({ ...form, inventoryCategories: newOrder });
+      setSettings({ ...settings, inventoryCategories: newOrder });
+    }
+  };
 
 
   // Inventory category handlers (with context sync)
