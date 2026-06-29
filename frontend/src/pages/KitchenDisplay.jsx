@@ -84,12 +84,17 @@ function KOTCard({ kot }) {
       </div>
 
       {/* Order-level notes */}
-      {kot.notes && (
-        <div style={{ background: 'rgba(245,197,24,0.08)', border: '1px solid rgba(245,197,24,0.3)', borderRadius: 6, padding: '6px 8px', fontSize: 11, color: '#f5c518', display: 'flex', gap: 6, alignItems: 'flex-start' }}>
-          <AlertCircle size={12} style={{ marginTop: 1, flexShrink: 0 }} />
-          <span>{kot.notes}</span>
-        </div>
-      )}
+      {(() => {
+        const cleanedNotes = kot.notes
+          ? kot.notes.replace(/pos_print_[a-z0-9]+/gi, '').replace(/^\s*,\s*|\s*,\s*$/g, '').trim()
+          : '';
+        return cleanedNotes ? (
+          <div style={{ background: 'rgba(245,197,24,0.08)', border: '1px solid rgba(245,197,24,0.3)', borderRadius: 6, padding: '6px 8px', fontSize: 11, color: '#f5c518', display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+            <AlertCircle size={12} style={{ marginTop: 1, flexShrink: 0 }} />
+            <span>{cleanedNotes}</span>
+          </div>
+        ) : null;
+      })()}
     </div>
   );
 }
