@@ -10,6 +10,8 @@ const settingsSchema = new mongoose.Schema({
   currency:       { type: String, default: '₹' },
   thankYouMsg:    { type: String, default: '' },
   darkMode:       { type: Boolean, default: true },
+  directPrinting: { type: Boolean, default: false },
+  qzTrayEnabled:  { type: Boolean, default: false },
   printAgentEnabled: { type: Boolean, default: false },
   printAgentPort: { type: Number, default: 5001 },
   printAgentToken: { type: String, default: '' },

@@ -10,6 +10,9 @@ const menuItemSchema = new mongoose.Schema({
   shortcut:  { type: String, default: '', lowercase: true, trim: true },
   isVeg:     { type: Boolean, default: true },
   order:     { type: Number, default: 0 },
+  trackStock: { type: Boolean, default: false },
+  inventoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Inventory', default: null },
+  stockDeductionQty: { type: Number, default: 1 },
 }, { timestamps: true });
 
 // Create a unique index only for non-empty shortcuts

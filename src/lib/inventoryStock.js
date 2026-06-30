@@ -26,18 +26,42 @@ function itemsFromQuantityMap(quantities) {
   return [...quantities.entries()].map(([name, quantity]) => ({ name, quantity }));
 }
 
-async function updateMenuAvailability(names) {
-  if (!names.length) return;
+async function updateMenuAvailability() {
+  const menuItems = await MenuItem.find();
+  const inventoryItems = await Inventory.find();
+  
+  const inventoryById = new Map(inventoryItems.map(i => [i._id.toString(), i]));
+  const inventoryByName = new Map(inventoryItems.map(i => [i.name.trim().toLowerCase(), i]));
 
-  const inventoryItems = await Inventory.find({ name: { $in: names } }).select('name stock trackStock');
-  const ops = inventoryItems.map(item => ({
-    updateOne: {
-      filter: { name: item.name },
-      update: { $set: { available: item.trackStock === false ? true : (item.stock > 0) } }
+  const ops = [];
+  for (const menuItem of menuItems) {
+    let isAvailable = true;
+
+    if (menuItem.trackStock && menuItem.inventoryId) {
+      const inv = inventoryById.get(menuItem.inventoryId.toString());
+      if (inv && inv.trackStock !== false) {
+        isAvailable = inv.stock >= (menuItem.stockDeductionQty || 1);
+      }
+    } else {
+      const inv = inventoryByName.get(menuItem.name.trim().toLowerCase());
+      if (inv && inv.trackStock !== false) {
+        isAvailable = inv.stock > 0;
+      }
     }
-  }));
 
-  if (ops.length) await MenuItem.bulkWrite(ops, { ordered: false });
+    if (menuItem.available !== isAvailable) {
+      ops.push({
+        updateOne: {
+          filter: { _id: menuItem._id },
+          update: { $set: { available: isAvailable } }
+        }
+      });
+    }
+  }
+
+  if (ops.length) {
+    await MenuItem.bulkWrite(ops, { ordered: false });
+  }
 }
 
 async function getInventorySnapshot() {
@@ -73,31 +97,64 @@ async function deductInventoryForItems(items = []) {
   const names = [...quantities.keys()];
   if (!names.length) return getInventorySnapshot();
 
-  const inventoryItems = await Inventory.find({ name: { $in: names } }).select('name trackStock');
-  const trackedNames = new Set(
-    inventoryItems
-      .filter(item => item.trackStock !== false)
-      .map(item => item.name)
-  );
+  const menuItems = await MenuItem.find({ name: { $in: names } });
+  const menuItemMap = new Map(menuItems.map(m => [m.name.trim().toLowerCase(), m]));
+
+  const linkedInvIds = menuItems
+    .filter(m => m.trackStock && m.inventoryId)
+    .map(m => m.inventoryId);
+
+  const inventoryItems = await Inventory.find({
+    $or: [
+      { name: { $in: names } },
+      { _id: { $in: linkedInvIds } }
+    ]
+  });
+
+  const inventoryById = new Map();
+  const inventoryByName = new Map();
+  for (const inv of inventoryItems) {
+    inventoryById.set(inv._id.toString(), inv);
+    inventoryByName.set(inv.name.trim().toLowerCase(), inv);
+  }
 
   const ops = [];
   for (const [name, quantity] of quantities.entries()) {
-    if (trackedNames.has(name)) {
-      ops.push({
-        updateOne: {
-          filter: { name },
-          update: [
-            { $set: { stock: { $max: [0, { $subtract: ['$stock', quantity] }] } } }
-          ]
-        }
-      });
+    const menuItem = menuItemMap.get(name.trim().toLowerCase());
+    
+    if (menuItem && menuItem.trackStock && menuItem.inventoryId) {
+      const invIdStr = menuItem.inventoryId.toString();
+      const inv = inventoryById.get(invIdStr);
+      if (inv && inv.trackStock !== false) {
+        const deductQty = quantity * (menuItem.stockDeductionQty || 1);
+        ops.push({
+          updateOne: {
+            filter: { _id: inv._id },
+            update: [
+              { $set: { stock: { $max: [0, { $subtract: ['$stock', deductQty] }] } } }
+            ]
+          }
+        });
+      }
+    } else {
+      const inv = inventoryByName.get(name.trim().toLowerCase());
+      if (inv && inv.trackStock !== false) {
+        ops.push({
+          updateOne: {
+            filter: { _id: inv._id },
+            update: [
+              { $set: { stock: { $max: [0, { $subtract: ['$stock', quantity] }] } } }
+            ]
+          }
+        });
+      }
     }
   }
 
   if (ops.length) {
     await Inventory.bulkWrite(ops, { ordered: false });
   }
-  await updateMenuAvailability(names);
+  await updateMenuAvailability();
   await deleteCache([INVENTORY_CACHE_KEY, MENU_CACHE_KEY]);
   return getInventorySnapshot();
 }
@@ -129,4 +186,5 @@ module.exports = {
   broadcastInventoryUpdate,
   deductInventoryForItems,
   getInventorySnapshot,
+  updateMenuAvailability,
 };

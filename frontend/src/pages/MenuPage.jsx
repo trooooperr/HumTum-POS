@@ -7,7 +7,7 @@ import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 
 /* ITEM MODAL */
 function ItemModal({ item, onClose, onSave }) {
-  const { settings } = useApp();
+  const { settings, inventory } = useApp();
   const menuCategories = Array.isArray(settings.menuCategories) && settings.menuCategories.length > 0
     ? settings.menuCategories
     : ['General'];
@@ -20,6 +20,9 @@ function ItemModal({ item, onClose, onSave }) {
     available: item?.available !== false,
     shortcut: item?.shortcut || '',
     isVeg: item?.isVeg !== false,
+    trackStock: item?.trackStock || false,
+    inventoryId: item?.inventoryId?._id || item?.inventoryId || '',
+    stockDeductionQty: item?.stockDeductionQty || 1,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -27,9 +30,60 @@ function ItemModal({ item, onClose, onSave }) {
   const handleSubmit = async () => {
     if (!form.name.trim()) { setError('Name is required'); return; }
     if (!form.price || isNaN(form.price)) { setError('Valid price required'); return; }
+    
+    let inventoryId = null;
+    let stockDeductionQty = 1;
+    
+    if (form.trackStock) {
+      if (!form.inventoryId) { setError('Please select a linked inventory item'); return; }
+      
+      const parsedVal = form.stockDeductionQty;
+      let finalQty = 1;
+      if (typeof parsedVal === 'number') {
+        finalQty = parsedVal;
+      } else {
+        const str = String(parsedVal || '').trim();
+        if (str.includes('/')) {
+          const parts = str.split('/');
+          if (parts.length === 2) {
+            const num = parseFloat(parts[0]);
+            const den = parseFloat(parts[1]);
+            if (isNaN(num) || isNaN(den) || den === 0) {
+              setError('Invalid fraction format (e.g. 30/750)');
+              return;
+            }
+            finalQty = num / den;
+          } else {
+            setError('Invalid deduction quantity');
+            return;
+          }
+        } else {
+          finalQty = parseFloat(str);
+          if (isNaN(finalQty)) {
+            setError('Deduction quantity must be a valid number');
+            return;
+          }
+        }
+      }
+      
+      if (finalQty <= 0) {
+        setError('Deduction quantity must be greater than 0');
+        return;
+      }
+      
+      inventoryId = form.inventoryId;
+      stockDeductionQty = finalQty;
+    }
+
     setSaving(true);
     try {
-      await onSave({ ...form, price: parseFloat(form.price) });
+      await onSave({ 
+        ...form, 
+        price: parseFloat(form.price),
+        trackStock: form.trackStock,
+        inventoryId,
+        stockDeductionQty
+      });
       onClose();
     } catch (e) { setError(e.message); } finally { setSaving(false); }
   };
@@ -73,33 +127,50 @@ function ItemModal({ item, onClose, onSave }) {
           <input value={form.imageUrl} onChange={e => setForm({ ...form, imageUrl: e.target.value })}
             placeholder="https://images.unsplash.com/photo..." />
         </div>
-        <div className="fgroup" style={{ marginBottom: 20 }}>
-          <div style={{ display: 'flex', gap: '30px' }}>
-            <div className="menu-availability-row" style={{ flex: 1 }}>
-              <label className="lbl">Menu Availability</label>
-              <label className="switch">
-                <input
-                  type="checkbox"
-                  checked={form.available}
-                  onChange={e => setForm({ ...form, available: e.target.checked })}
-                />
-                <span className="slider round"></span>
-              </label>
-            </div>
-            <div className="menu-availability-row" style={{ flex: 1 }}>
-              <label className="lbl">Is Veg (Green)</label>
-              <label className="switch">
-                <input
-                  type="checkbox"
-                  checked={form.isVeg}
-                  onChange={e => setForm({ ...form, isVeg: e.target.checked })}
-                />
-                <span className="slider round"></span>
-              </label>
-            </div>
+        <div style={{ borderTop: '1px solid var(--b1)', paddingTop: '15px', marginTop: '15px' }}>
+          <div className="menu-availability-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <label className="lbl" style={{ margin: 0 }}>Manage Stock (Link to Inventory)</label>
+            <label className="switch">
+              <input
+                type="checkbox"
+                checked={form.trackStock}
+                onChange={e => setForm({ ...form, trackStock: e.target.checked })}
+              />
+              <span className="slider round"></span>
+            </label>
           </div>
+
+          {form.trackStock && (
+            <div className="frow2" style={{ marginTop: '10px', gap: '15px' }}>
+              <div className="fgroup" style={{ flex: 1 }}>
+                <label className="lbl">Link Inventory Item</label>
+                <select 
+                  value={form.inventoryId} 
+                  onChange={e => setForm({ ...form, inventoryId: e.target.value })}
+                  style={{ width: '100%' }}
+                >
+                  <option value="">-- Select Inventory Item --</option>
+                  {(inventory || []).map(inv => (
+                    <option key={inv._id} value={inv._id}>
+                      {inv.name} ({inv.unit}) - Stock: {inv.stock}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="fgroup" style={{ flex: 1 }}>
+                <label className="lbl">Deduction Qty (e.g. 5 or 30/750)</label>
+                <input 
+                  type="text" 
+                  value={form.stockDeductionQty} 
+                  onChange={e => setForm({ ...form, stockDeductionQty: e.target.value })}
+                  placeholder="e.g. 1, 5, or 30/750"
+                />
+              </div>
+            </div>
+          )}
         </div>
-        <div className="m-actions">
+        {error && <div style={{ color: 'var(--red)', fontSize: '12px', marginTop: '10px', fontWeight: '500' }}>{error}</div>}
+        <div className="m-actions" style={{ marginTop: '20px' }}>
           <button className="btn btn-ghost " style={{ marginRight: '10px' }} onClick={onClose}>Cancel</button>
           <button className="btn btn-primary" onClick={handleSubmit} disabled={saving}>
             {saving ? 'Saving...' : 'Save Item'}
@@ -269,6 +340,19 @@ export default function MenuPage() {
                                   <span>{item.name}</span>
                                 </div>
                                 <span className="badge-mini">{item.category}</span>
+                                {item.trackStock && item.inventoryId && (
+                                  <div style={{ fontSize: '9px', color: 'var(--accent)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                    <span>📦 {
+                                      typeof item.inventoryId === 'object' 
+                                        ? item.inventoryId.name 
+                                        : (inventory?.find(inv => inv._id === item.inventoryId)?.name || 'Loading...')
+                                    } ({
+                                      Number(item.stockDeductionQty) < 1 
+                                        ? Number(item.stockDeductionQty).toFixed(3).replace(/\.?0+$/, '') 
+                                        : item.stockDeductionQty
+                                    })</span>
+                                  </div>
+                                )}
                               </div>
                               <div className="menu-item-price">₹{item.price.toFixed(0)}</div>
                             </div>
@@ -323,27 +407,44 @@ export default function MenuPage() {
                             }}
                           >
                             <td style={{ fontWeight: 600 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                {item.department !== 'bar' && (
-                                  <span style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    width: 14,
-                                    height: 14,
-                                    border: `1px solid ${item.isVeg !== false ? '#28a745' : '#dc3545'}`,
-                                    padding: 2,
-                                    flexShrink: 0
-                                  }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  {item.department !== 'bar' && (
                                     <span style={{
-                                      width: 6,
-                                      height: 6,
-                                      borderRadius: '50%',
-                                      backgroundColor: item.isVeg !== false ? '#28a745' : '#dc3545'
-                                    }} />
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      width: 14,
+                                      height: 14,
+                                      border: `1px solid ${item.isVeg !== false ? '#28a745' : '#dc3545'}`,
+                                      padding: 2,
+                                      flexShrink: 0
+                                    }}>
+                                      <span style={{
+                                        width: 6,
+                                        height: 6,
+                                        borderRadius: '50%',
+                                        backgroundColor: item.isVeg !== false ? '#28a745' : '#dc3545'
+                                      }} />
+                                    </span>
+                                  )}
+                                  <span>{item.name}</span>
+                                </div>
+                                {item.trackStock && item.inventoryId && (
+                                  <span style={{ fontSize: '10px', color: '#8b949e', fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px' }}>
+                                    <span>📦 Linked:</span>
+                                    <span style={{ color: 'var(--accent)' }}>
+                                      {typeof item.inventoryId === 'object' 
+                                        ? item.inventoryId.name 
+                                        : (inventory?.find(inv => inv._id === item.inventoryId)?.name || 'Loading...')}
+                                    </span>
+                                    <span>(deducts {
+                                      Number(item.stockDeductionQty) < 1 
+                                        ? Number(item.stockDeductionQty).toFixed(3).replace(/\.?0+$/, '') 
+                                        : item.stockDeductionQty
+                                    })</span>
                                   </span>
                                 )}
-                                <span>{item.name}</span>
                               </div>
                             </td>
                             <td><span className="badge">{item.category}</span></td>

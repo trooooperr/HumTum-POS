@@ -67,6 +67,8 @@ function normalizeSettings(data) {
     currency: data.currency || '₹',
     thankYouMsg: data.thankYouMsg || '',
     darkMode: data.darkMode !== false,
+    directPrinting: !!data.directPrinting,
+    qzTrayEnabled: !!data.qzTrayEnabled,
     printAgentEnabled: !!data.printAgentEnabled,
     printAgentPort: Number(data.printAgentPort) || 5001,
     printAgentToken: data.printAgentToken || '',
@@ -186,6 +188,8 @@ router.put('/', requireRole(['admin', 'manager']), async (req, res) => {
   if (req.body.currency !== undefined) settings.currency = cleanString(req.body.currency, '₹').slice(0, 4) || '₹';
   if (req.body.thankYouMsg !== undefined) settings.thankYouMsg = cleanString(req.body.thankYouMsg);
   if (req.body.darkMode !== undefined) settings.darkMode = !!req.body.darkMode;
+  if (req.body.directPrinting !== undefined) settings.directPrinting = !!req.body.directPrinting;
+  if (req.body.qzTrayEnabled !== undefined) settings.qzTrayEnabled = !!req.body.qzTrayEnabled;
   if (req.body.printAgentEnabled !== undefined) settings.printAgentEnabled = !!req.body.printAgentEnabled;
   if (req.body.printAgentPort !== undefined) settings.printAgentPort = cleanNumber(req.body.printAgentPort, 5001);
   if (req.body.printAgentToken !== undefined) settings.printAgentToken = cleanString(req.body.printAgentToken);

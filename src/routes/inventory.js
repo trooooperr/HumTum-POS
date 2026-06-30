@@ -4,6 +4,7 @@ const Inventory = require('../models/Inventory');
 const MenuItem = require('../models/MenuItem');
 const { getCache, setCache, deleteCache } = require('../lib/redis');
 const { requireRole } = require('../middleware/auth');
+const { updateMenuAvailability } = require('../lib/inventoryStock');
 const router = express.Router();
 
 const INVENTORY_CACHE_KEY = 'inventory:all';
@@ -202,10 +203,7 @@ router.patch('/:id/stock', requireRole(['admin', 'manager']), async (req, res) =
     item.stock = Math.max(0, item.stock + quantityChange);
     const updated = await item.save();
     // Sync menu item availability
-    await MenuItem.findOneAndUpdate(
-      { name: item.name },
-      { available: updated.trackStock === false ? true : (updated.stock > 0) }
-    );
+    await updateMenuAvailability();
     await deleteCache([INVENTORY_CACHE_KEY, MENU_CACHE_KEY]);
     if (req.app.locals.io) {
       req.app.locals.io.emit('REFRESH_MENU');

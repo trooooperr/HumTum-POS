@@ -4,6 +4,7 @@ const MenuItem = require('../models/MenuItem');
 const Inventory = require('../models/Inventory');
 const { getCache, setCache, deleteCache } = require('../lib/redis');
 const { requireRole } = require('../middleware/auth');
+const { updateMenuAvailability } = require('../lib/inventoryStock');
 const router = express.Router();
 
 const MENU_CACHE_KEY = 'menu:all';
@@ -39,7 +40,7 @@ const sortMenuItems = async (items) => {
 // Get all menu items (Staff and above can view menu)
 router.get('/', async (req, res) => {
   try {
-    const rawItems = await MenuItem.find();
+    const rawItems = await MenuItem.find().populate('inventoryId');
     const items = await sortMenuItems(rawItems);
     await setCache(MENU_CACHE_KEY, items, 300);
     res.json(items);
@@ -143,7 +144,9 @@ router.post('/', requireRole(['admin', 'manager']), async (req, res) => {
     const data = req.body;
     if (data.shortcut) data.shortcut = data.shortcut.toLowerCase().trim();
     const item = new MenuItem(data);
-    const saved = await item.save();
+    await item.save();
+    await updateMenuAvailability();
+    const saved = await MenuItem.findById(item._id).populate('inventoryId');
     await deleteCache(MENU_CACHE_KEY);
     if (req.app.locals.io) {
       req.app.locals.io.emit('REFRESH_MENU');
@@ -159,11 +162,13 @@ router.put('/:id', requireRole(['admin', 'manager']), async (req, res) => {
     if (data.shortcut) data.shortcut = data.shortcut.toLowerCase().trim();
     const updated = await MenuItem.findByIdAndUpdate(req.params.id, data, { new: true, runValidators: true });
     if (!updated) return res.status(404).json({ message: 'Item not found' });
+    await updateMenuAvailability();
+    const freshUpdated = await MenuItem.findById(req.params.id).populate('inventoryId');
     await deleteCache(MENU_CACHE_KEY);
     if (req.app.locals.io) {
       req.app.locals.io.emit('REFRESH_MENU');
     }
-    res.json(updated);
+    res.json(freshUpdated);
   } catch (err) { res.status(400).json({ message: err.message }); }
 });
 
