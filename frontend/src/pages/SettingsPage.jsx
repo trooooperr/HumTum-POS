@@ -260,7 +260,7 @@ export default function SettingsPage() {
     if (savingEmail) return;
     setSavingEmail(true);
     try {
-      await saveSettings({ ...settings, adminEmail: email.adminEmail });
+      await saveSettings({ ...form, adminEmail: email.adminEmail });
       showToast('Email settings saved successfully');
     } catch (e) {
       showToast('Error saving email: ' + e.message, 'error');
