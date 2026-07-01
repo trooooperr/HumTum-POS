@@ -66,7 +66,7 @@ function getEdgePath() {
 
 // Find or download SumatraPDF.exe
 const sumatraPath = path.join(execDir, 'SumatraPDF.exe');
-const SUMATRA_URL = 'https://www.sumatrapdfreader.org/dl/SumatraPDF-3.5.2-64.exe';
+const SUMATRA_URL = 'https://www.sumatrapdfreader.org/dl/rel/3.5.2/SumatraPDF-3.5.2-64.exe';
 
 function ensureSumatraPDF() {
   return new Promise((resolve, reject) => {
