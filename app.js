@@ -30,6 +30,11 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
 }));
 
+app.use((req, res, next) => {
+  res.setHeader('Permissions-Policy', 'local-network-access=(self), loopback-network=(self), local-network=(self)');
+  next();
+});
+
 // ── CORS — allowlist via env ─────────────────────────────────────
 // Set ALLOWED_ORIGINS in .env as a comma-separated list of allowed origins.
 // If not set, defaults to localhost dev ports.
