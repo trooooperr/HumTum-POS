@@ -10,6 +10,7 @@ const SECTION_MAP = {
   restaurantArea: [15,16,17,18,19,20,21],
 };
 function KOTCard({ kot }) {
+  const { role, deleteKOT, removeKOTItem, showToast } = useApp();
   const formatTime = (dateStr) => {
     return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
   };
@@ -47,11 +48,37 @@ function KOTCard({ kot }) {
             )}
           </div>
         </div>
-        <div style={{ textAlign: 'right' }}>
+        <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
           <div style={{ fontSize: 12, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 4 }} className="kot-time-text">
             <Clock size={12} />
             {formatTime(kot.createdAt)}
           </div>
+          {(role === 'admin' || role === 'manager') && (
+            <button
+              onClick={async () => {
+                if (window.confirm(`⚠️ Are you sure you want to DELETE entire "${kot.kotNo || 'KOT'}"? All items in it will be deleted, and stock will be refunded.`)) {
+                  try {
+                    await deleteKOT(kot._id, kot.tableNo);
+                    showToast('KOT deleted and stock refunded successfully', 'success');
+                  } catch (err) {
+                    showToast(err.message || 'Failed to delete KOT', 'error');
+                  }
+                }
+              }}
+              style={{
+                background: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                color: '#ff4d4d',
+                padding: '2px 8px',
+                borderRadius: '6px',
+                fontSize: '10px',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
+              Delete
+            </button>
+          )}
         </div>
       </div>
 
@@ -76,8 +103,75 @@ function KOTCard({ kot }) {
                 </div>
               )}
             </div>
-            <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--t0)', minWidth: 24, textAlign: 'right' }}>
-              ×{item.quantity}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--t0)' }}>
+                ×{item.quantity}
+              </span>
+              {(role === 'admin' || role === 'manager') && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (window.confirm(`Remove 1x "${item.name}" from KOT?`)) {
+                        try {
+                          await removeKOTItem(kot.orderId, item.name, 1);
+                          showToast(`Removed 1x "${item.name}" successfully`, 'success');
+                        } catch (err) {
+                          showToast(err.message || 'Failed to remove item', 'error');
+                        }
+                      }
+                    }}
+                    style={{
+                      background: 'var(--s2)',
+                      border: '1px solid var(--b2)',
+                      color: '#ef4444',
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      padding: 0
+                    }}
+                    title="Remove 1x"
+                  >
+                    −
+                  </button>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (window.confirm(`Delete all "${item.name}" from this KOT?`)) {
+                        try {
+                          await removeKOTItem(kot.orderId, item.name, item.quantity);
+                          showToast(`Deleted "${item.name}" successfully`, 'success');
+                        } catch (err) {
+                          showToast(err.message || 'Failed to remove item', 'error');
+                        }
+                      }
+                    }}
+                    style={{
+                      background: 'var(--s2)',
+                      border: '1px solid var(--b2)',
+                      color: '#9ca3af',
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '10px',
+                      cursor: 'pointer',
+                      padding: 0
+                    }}
+                    title="Delete all"
+                  >
+                    🗑️
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -174,6 +268,12 @@ export default function KitchenDisplay({ department = 'kitchen' }) {
         }
       });
 
+      socket.on('KOT_DELETED', (data) => {
+        if (data.kotId) {
+          setKots(prev => prev.filter(k => k._id !== data.kotId));
+        }
+      });
+
       socket.on('ORDER_COMPLETED', (data) => {
         if (data.tableNo) {
           setKots(prev => prev.filter(k => k.tableNo !== parseInt(data.tableNo)));
@@ -183,6 +283,7 @@ export default function KitchenDisplay({ department = 'kitchen' }) {
       return () => {
         socket.off('NEW_KOT');
         socket.off('KOT_UPDATED');
+        socket.off('KOT_DELETED');
         socket.off('ORDER_COMPLETED');
       };
     }

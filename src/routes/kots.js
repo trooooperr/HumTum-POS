@@ -351,6 +351,7 @@ router.delete('/:id', requireRole(['admin', 'manager']), async (req, res) => {
     // Broadcast changes via Socket.IO
     if (req.app.locals.io) {
       req.app.locals.io.emit('REFRESH_MENU');
+      req.app.locals.io.emit('KOT_DELETED', { kotId: kot._id });
       if (session) {
         req.app.locals.io.emit('TABLE_SESSION_UPDATED', {
           tableNo: kot.tableNo,
@@ -428,9 +429,15 @@ router.post('/remove-item', async (req, res) => {
           { activeOrderId: orderId },
           { $pull: { kotIds: kot._id } }
         );
+        if (req.app.locals.io) {
+          req.app.locals.io.emit('KOT_DELETED', { kotId: kot._id });
+        }
       } else {
         // Save updated KOT
         await kot.save();
+        if (req.app.locals.io) {
+          req.app.locals.io.emit('KOT_UPDATED', kot);
+        }
       }
     }
 
