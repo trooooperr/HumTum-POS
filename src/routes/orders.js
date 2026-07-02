@@ -441,6 +441,35 @@ router.delete('/:id', requireRole(['admin', 'manager']), async (req, res) => {
   } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
+// ── CANCEL TABLE SESSION (CLR – wipe table without saving to history) ───
+router.delete('/table/:tableNo/cancel', async (req, res) => {
+  try {
+    const tableNo = parseInt(req.params.tableNo);
+
+    // Find the active session for this table
+    const sessions = await TableSession.find({ tableNo, status: { $ne: 'COMPLETED' } });
+
+    for (const session of sessions) {
+      const orderId = session.activeOrderId;
+
+      // Delete all KOTs linked to this order
+      if (orderId) {
+        await KOT.deleteMany({ orderId });
+        // Delete the order itself (no history kept)
+        await Order.findByIdAndDelete(orderId);
+      }
+
+      // Delete the session
+      await TableSession.findByIdAndDelete(session._id);
+    }
+
+    await deleteCache([ORDERS_CACHE_KEY, REPORT_SUMMARY_CACHE_KEY]);
+    res.json({ success: true, message: `Table ${tableNo} cleared` });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // ── ADMIN: Reset all bills and counters ─────────────────────────
 router.post('/admin/reset-bills', requireRole(['admin']), async (req, res) => {
   try {

@@ -1220,7 +1220,21 @@ export function AppProvider({ children }) {
     }
   }, []);
 
-  // ── KOT Functions ───────────────────────────────────────────────
+  // ── Cancel (CLR) table session without saving to history ────────
+  const cancelTableSession = useCallback(async (tableNo) => {
+    try {
+      const res = await authFetch(apiUrl(`/api/orders/table/${tableNo}/cancel`), {
+        method: 'DELETE'
+      });
+      if (!res.ok) throw new Error('Failed to cancel table session');
+      return await res.json();
+    } catch (err) {
+      console.error('Cancel session error:', err);
+      throw err;
+    }
+  }, []);
+
+
   const openTableSession = useCallback(async (tableNo, waiterName = '', orderType = 'dine-in') => {
     try {
       const res = await authFetch(apiUrl(`/api/orders/table/${tableNo}/open`), {
@@ -1453,7 +1467,7 @@ export function AppProvider({ children }) {
       // Socket.IO & KOT functions
       socket,
       kotSessions, currentSession, kots,
-      openTableSession, syncTableSession, createKOT, updateKOTStatus, removeKOTItem, deleteKOT, finalizeBill, completeOrder,
+      openTableSession, syncTableSession, createKOT, updateKOTStatus, removeKOTItem, deleteKOT, finalizeBill, completeOrder, cancelTableSession,
       printKOTDocument, printBillDocument,
     }}>
       {children}

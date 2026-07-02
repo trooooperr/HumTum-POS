@@ -135,6 +135,31 @@ async function migrateInventoryMenuItems() {
   }
 }
 
+// ── Startup migration: seed CLR menu item ──
+async function seedCLRMenuItem() {
+  try {
+    const MenuItem = require('./src/models/MenuItem');
+    const existing = await MenuItem.findOne({ name: { $regex: /^clr$/i } });
+    if (!existing) {
+      await MenuItem.create({
+        name: 'CLR',
+        category: 'Food',
+        price: 0,
+        available: true,
+        department: 'kitchen',
+        shortcut: 'clr',
+        isVeg: true,
+        order: 999
+      });
+      console.log('✅ Seeded CLR menu item');
+      const { deleteCache } = require('./src/lib/redis');
+      await deleteCache('menu:all').catch(() => {});
+    }
+  } catch (err) {
+    console.warn('⚠️ Seeding CLR menu item failed:', err.message);
+  }
+}
+
 // ── Graceful shutdown ────────────────────────────────────────────
 let isShuttingDown = false;
 
@@ -325,6 +350,7 @@ async function startServer() {
     })();
 
     await seedDefaultUsers();
+    await seedCLRMenuItem();
     await connectRedis();
     await warmupCache();
     await migrateInventoryMenuItems();

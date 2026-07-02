@@ -190,7 +190,7 @@ export default function BillingPage() {
     allSellableItems,
     billTotals, filteredMenu, categories, categoryFilter, setCategoryFilter,
     menuSearch, setMenuSearch, inventory, workers, getTableStatus, getTableInfo, settings, NUM_TABLES,
-    openTableSession, createKOT, finalizeBill, completeOrder, socket, syncTableSession,
+    openTableSession, createKOT, finalizeBill, completeOrder, socket, syncTableSession, cancelTableSession,
     setSidebarOpen, showToast, printKOTDocument, printBillDocument,
     removeKOTItem, deleteKOT, role
   } = useApp();
@@ -545,6 +545,28 @@ export default function BillingPage() {
         return;
       }
 
+      const hasClrItem = table.items.some(i => i.name && i.name.toUpperCase() === 'CLR');
+      if (hasClrItem) {
+        setBusy(true);
+        try {
+          const tableNo = parseInt(activeTableId.substring(1));
+          await cancelTableSession(tableNo);
+          clearTable(activeTableId);
+          setKots([]);
+          setActiveOrder(null);
+          setSelectedWaiterRaw('');
+          setOrderTypeRaw('dine-in');
+          setBillError('');
+          setMobileBillOpen(false);
+          showToast(`Table ${tableNo} cleared`, 'success');
+        } catch (err) {
+          setBillError(err.message);
+        } finally {
+          setBusy(false);
+        }
+        return;
+      }
+
       setBusy(true);
       const tableNo = parseInt(activeTableId.substring(1));
 
@@ -622,6 +644,26 @@ export default function BillingPage() {
 
       const tableNo = parseInt(activeTableId.substring(1));
 
+      const hasClrItem = combinedItems.all.some(i => i.name && i.name.toUpperCase() === 'CLR');
+      if (hasClrItem) {
+        try {
+          await cancelTableSession(tableNo);
+          clearTable(activeTableId);
+          setKots([]);
+          setActiveOrder(null);
+          setSelectedWaiterRaw('');
+          setOrderTypeRaw('dine-in');
+          setBillError('');
+          setMobileBillOpen(false);
+          showToast(`Table ${tableNo} cleared`, 'success');
+        } catch (err) {
+          setBillError(err.message);
+        } finally {
+          setBusy(false);
+        }
+        return;
+      }
+
       // Finalize bill (combines all KOTs and leftover items)
       const finalizedOrder = await finalizeBill(
         orderId,
@@ -654,14 +696,8 @@ export default function BillingPage() {
         0
       );
 
-      // Auto-send WhatsApp review message if customer phone is filled
-      if (table.customerPhone && table.customerPhone.trim().length >= 10) {
-        const phone = table.customerPhone.trim();
-        const googleLink = settings.googleReviewLink || 'https://g.page/r/.../review';
-        const message = `*${settings.restaurantName || 'HUMTUM'}*\n\nThank you for dining with us! 🙏\nWe hope you had a wonderful experience.\n\nPlease share your valuable feedback and review us on Google: ${googleLink}`;
-        const encoded = encodeURIComponent(message);
-        window.open(`https://wa.me/91${phone}?text=${encoded}`, '_blank');
-      }
+      // Auto-send WhatsApp review message — DISABLED
+      // if (table.customerPhone && ...) { window.open(...) }
 
       clearTable(activeTableId);
       setKots([]);
@@ -680,6 +716,32 @@ export default function BillingPage() {
   const doGen = async paid => {
     if (busy) return;
     await printFinalBill(paid);
+  };
+
+  // CLR TABLE: Cancel session without saving to order history
+  const handleClearTable = async () => {
+    if (!activeTableId) return;
+    const tableNo = parseInt(activeTableId.substring(1));
+    const hasItems = combinedItems.all.length > 0 || kots.length > 0;
+    const msg = hasItems
+      ? `Clear Table ${tableNo}? This will discard all items and KOTs for this table. Nothing will be saved to order history.`
+      : `Clear Table ${tableNo}? The table will be marked as free.`;
+    if (!window.confirm(msg)) return;
+    setBusy(true);
+    try {
+      await cancelTableSession(tableNo);
+      clearTable(activeTableId);
+      setActiveOrder(null);
+      setKots([]);
+      setSelectedWaiterRaw('');
+      setOrderTypeRaw('dine-in');
+      setMobileBillOpen(false);
+      showToast(`Table ${tableNo} cleared`, 'success');
+    } catch (err) {
+      showToast(err.message || 'Failed to clear table', 'error');
+    } finally {
+      setBusy(false);
+    }
   };
 
   useEffect(() => {
@@ -1090,6 +1152,16 @@ export default function BillingPage() {
                   {busy ? 'Processing…' : 'Print Bill'}
                 </button>
               </div>
+              {/* CLR TABLE: clear table without saving to history */}
+              <button
+                className="btn btn-danger btn-lg"
+                style={{ width: '100%', marginBottom: 4, opacity: 0.85, letterSpacing: 1 }}
+                onClick={handleClearTable}
+                disabled={busy}
+                title="Clear this table (no bill saved to history)"
+              >
+                CLR TABLE
+              </button>
             </div>
 
             {/* KOT History */}
