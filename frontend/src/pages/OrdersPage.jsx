@@ -1,9 +1,7 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { Search, CalendarDays, X, ShoppingCart } from 'lucide-react';
-import InvoiceModal from '../components/InvoiceModal';
+import { Search, CalendarDays, X } from 'lucide-react';
 import TopNavBar from '../components/TopNavBar';
-import { apiUrl, authFetch } from '../lib/api';
 
 function DateField({ value, onChange, inputRef, label }) {
   const triggerPicker = () => {
@@ -38,33 +36,32 @@ function DateField({ value, onChange, inputRef, label }) {
   );
 }
 
-/* Payment Edit Popup */
-function PaymentEditPopup({ order, currency, onSave, onClose }) {
+/* Centered Payment Edit Modal (prevents overflow/clipping bugs) */
+function PaymentEditModal({ order, currency, onSave, onClose }) {
   const [mode, setMode] = useState(order.paymentMode || 'cash');
   const [cashAmt, setCashAmt] = useState(order.cashAmount ? String(order.cashAmount) : '');
   const [upiAmt, setUpiAmt] = useState(order.upiAmount ? String(order.upiAmount) : '');
   const [saving, setSaving] = useState(false);
-  const popupRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (popupRef.current && !popupRef.current.contains(e.target)) {
-        onClose();
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [onClose]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
       let cash = 0, upi = 0;
-      if (mode === 'cash') { cash = order.grandTotal; upi = 0; }
-      else if (mode === 'upi') { cash = 0; upi = order.grandTotal; }
-      else if (mode === 'split') {
+      if (mode === 'cash') {
+        cash = order.grandTotal;
+        upi = 0;
+      } else if (mode === 'upi') {
+        cash = 0;
+        upi = order.grandTotal;
+      } else if (mode === 'split') {
         cash = parseFloat(cashAmt) || 0;
         upi = parseFloat(upiAmt) || 0;
+        // Simple tolerance check to verify total sums up
+        if (Math.abs(cash + upi - order.grandTotal) > 0.02) {
+          alert(`Split amounts (₹${(cash + upi).toFixed(0)}) must equal the grand total (₹${order.grandTotal.toFixed(0)})`);
+          setSaving(false);
+          return;
+        }
       }
       await onSave(order._id, mode, cash, upi);
       onClose();
@@ -76,74 +73,100 @@ function PaymentEditPopup({ order, currency, onSave, onClose }) {
   };
 
   return (
-    <div ref={popupRef} style={{
-      position: 'absolute', top: '100%', right: 0, zIndex: 1000,
-      background: 'var(--s1)', border: '1px solid var(--b2)',
-      borderRadius: 12, padding: 14, minWidth: 220,
-      boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
-      marginTop: 4
-    }} onClick={e => e.stopPropagation()}>
-      <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--t2)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Payment Mode</div>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-        {['cash', 'upi', 'split'].map(m => (
+    <div className="moverlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.85)' }} onClick={onClose}>
+      <div className="mbox" style={{ maxWidth: '340px', width: '92%', padding: '20px', position: 'relative' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: 'var(--t0)' }}>
+            HTB-{(order.billNo || '').split('-').pop()} Payment
+          </h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 4 }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <div style={{ fontSize: '13px', color: 'var(--t1)', marginBottom: 16 }}>
+          Grand Total: <span style={{ fontWeight: 800, color: 'var(--a)' }}>{currency}{order.grandTotal.toFixed(0)}</span>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          {['cash', 'upi', 'split'].map(m => (
+            <button
+              key={m}
+              onClick={() => { setMode(m); if (m !== 'split') { setCashAmt(''); setUpiAmt(''); } }}
+              style={{
+                flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 12, fontWeight: 700,
+                border: mode === m ? '2px solid var(--a)' : '1px solid var(--b2)',
+                background: mode === m ? 'rgba(245,158,11,0.12)' : 'var(--s2)',
+                color: mode === m ? 'var(--a)' : 'var(--t1)',
+                cursor: 'pointer', transition: 'all 0.15s'
+              }}
+            >
+              {m === 'split' ? 'SPLIT' : m.toUpperCase()}
+            </button>
+          ))}
+        </div>
+
+        {mode === 'split' && (
+          <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 11, color: 'var(--t2)', fontWeight: 700, display: 'block', marginBottom: 4 }}>Cash {currency}</label>
+              <input
+                type="number"
+                inputMode="numeric"
+                placeholder="0"
+                value={cashAmt}
+                onChange={e => {
+                  const v = e.target.value;
+                  setCashAmt(v);
+                  if (v !== '') setUpiAmt(Math.max(0, order.grandTotal - (parseFloat(v) || 0)).toFixed(0));
+                  else setUpiAmt('');
+                }}
+                style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--b1)', background: 'var(--s2)', color: 'var(--t0)', fontSize: 13, fontWeight: 700 }}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 11, color: 'var(--t2)', fontWeight: 700, display: 'block', marginBottom: 4 }}>UPI {currency}</label>
+              <input
+                type="number"
+                inputMode="numeric"
+                placeholder="0"
+                value={upiAmt}
+                onChange={e => {
+                  const v = e.target.value;
+                  setUpiAmt(v);
+                  if (v !== '') setCashAmt(Math.max(0, order.grandTotal - (parseFloat(v) || 0)).toFixed(0));
+                  else setCashAmt('');
+                }}
+                style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--b1)', background: 'var(--s2)', color: 'var(--t0)', fontSize: 13, fontWeight: 700 }}
+              />
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
           <button
-            key={m}
-            onClick={() => { setMode(m); if (m !== 'split') { setCashAmt(''); setUpiAmt(''); } }}
+            onClick={onClose}
             style={{
-              flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 11, fontWeight: 700,
-              border: mode === m ? '2px solid var(--a)' : '1px solid var(--b1)',
-              background: mode === m ? 'rgba(245,158,11,0.12)' : 'var(--s2)',
-              color: mode === m ? 'var(--a)' : 'var(--t1)',
-              cursor: 'pointer', transition: 'all 0.15s'
+              flex: 1, padding: '10px 0', borderRadius: 8, border: '1px solid var(--b2)',
+              background: 'var(--s2)', color: 'var(--t1)', fontSize: 13, fontWeight: 700,
+              cursor: 'pointer'
             }}
           >
-            {m === 'split' ? 'SPLIT' : m.toUpperCase()}
+            Cancel
           </button>
-        ))}
-      </div>
-
-      {mode === 'split' && (
-        <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-          <div style={{ flex: 1 }}>
-            <label style={{ fontSize: 10, color: 'var(--t2)', fontWeight: 700, display: 'block', marginBottom: 2 }}>Cash {currency}</label>
-            <input
-              type="number" inputMode="numeric" placeholder="0" value={cashAmt}
-              onChange={e => {
-                const v = e.target.value;
-                setCashAmt(v);
-                if (v !== '') setUpiAmt(Math.max(0, order.grandTotal - (parseFloat(v) || 0)).toFixed(0));
-                else setUpiAmt('');
-              }}
-              style={{ width: '100%', padding: '5px 8px', borderRadius: 8, border: '1px solid var(--b1)', background: 'var(--s2)', color: 'var(--t0)', fontSize: 12, fontWeight: 700 }}
-            />
-          </div>
-          <div style={{ flex: 1 }}>
-            <label style={{ fontSize: 10, color: 'var(--t2)', fontWeight: 700, display: 'block', marginBottom: 2 }}>UPI {currency}</label>
-            <input
-              type="number" inputMode="numeric" placeholder="0" value={upiAmt}
-              onChange={e => {
-                const v = e.target.value;
-                setUpiAmt(v);
-                if (v !== '') setCashAmt(Math.max(0, order.grandTotal - (parseFloat(v) || 0)).toFixed(0));
-                else setCashAmt('');
-              }}
-              style={{ width: '100%', padding: '5px 8px', borderRadius: 8, border: '1px solid var(--b1)', background: 'var(--s2)', color: 'var(--t0)', fontSize: 12, fontWeight: 700 }}
-            />
-          </div>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            style={{
+              flex: 1, padding: '10px 0', borderRadius: 8, border: 'none',
+              background: 'var(--a)', color: '#000', fontSize: 13, fontWeight: 800,
+              cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1
+            }}
+          >
+            {saving ? 'Saving...' : 'Save'}
+          </button>
         </div>
-      )}
-
-      <button
-        onClick={handleSave}
-        disabled={saving}
-        style={{
-          width: '100%', padding: '7px 0', borderRadius: 8, border: 'none',
-          background: 'var(--a)', color: '#000', fontSize: 12, fontWeight: 800,
-          cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1
-        }}
-      >
-        {saving ? 'Saving...' : 'Save'}
-      </button>
+      </div>
     </div>
   );
 }
@@ -153,7 +176,7 @@ export default function OrdersPage() {
   const [search, setSearch] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [editingPayment, setEditingPayment] = useState(null); // order._id being edited
+  const [editingPaymentOrder, setEditingPaymentOrder] = useState(null); // Full order object being edited
   const c = settings.currency;
   const startInputRef = React.useRef(null);
   const endInputRef = React.useRef(null);
@@ -190,30 +213,34 @@ export default function OrdersPage() {
     });
   }, [orderHistory, search, startDate, endDate]);
 
-  const totalDue = filtered.reduce((s, o) => s + (o.dueAmount || 0), 0);
-
   const payBadge = (mode, order) => {
     const cls = { cash: 'badge-cash', card: 'badge-card', upi: 'badge-upi', split: 'badge-split' };
-    const isEditing = editingPayment === order._id;
 
-    const badge = mode === 'split' && order
-      ? <span className={`badge badge-split`} style={{ cursor: 'pointer' }} title={`Cash: ${c}${(order.cashAmount||0).toFixed(0)}, UPI: ${c}${(order.upiAmount||0).toFixed(0)}`}>SPLIT (C:{(order.cashAmount||0).toFixed(0)} U:{(order.upiAmount||0).toFixed(0)})</span>
-      : <span className={`badge ${cls[mode] || 'badge-cash'}`} style={{ cursor: 'pointer' }}>{mode?.toUpperCase()}</span>;
+    const handleBadgeClick = (e) => {
+      e.stopPropagation();
+      setEditingPaymentOrder(order);
+    };
 
+    if (mode === 'split' && order) {
+      return (
+        <span
+          className="badge badge-split"
+          style={{ cursor: 'pointer' }}
+          onClick={handleBadgeClick}
+          title={`Cash: ${c}${(order.cashAmount||0).toFixed(0)}, UPI: ${c}${(order.upiAmount||0).toFixed(0)}`}
+        >
+          SPLIT (C:{(order.cashAmount||0).toFixed(0)} U:{(order.upiAmount||0).toFixed(0)})
+        </span>
+      );
+    }
     return (
-      <div style={{ position: 'relative', display: 'inline-block' }}>
-        <div onClick={(e) => { e.stopPropagation(); setEditingPayment(isEditing ? null : order._id); }}>
-          {badge}
-        </div>
-        {isEditing && (
-          <PaymentEditPopup
-            order={order}
-            currency={c}
-            onSave={handlePaymentSave}
-            onClose={() => setEditingPayment(null)}
-          />
-        )}
-      </div>
+      <span
+        className={`badge ${cls[mode] || 'badge-cash'}`}
+        style={{ cursor: 'pointer' }}
+        onClick={handleBadgeClick}
+      >
+        {mode?.toUpperCase()}
+      </span>
     );
   };
 
@@ -370,7 +397,16 @@ export default function OrdersPage() {
           </table>
         </div>
       </div>
+
+      {/* Payment Edit Modal Overlay */}
+      {editingPaymentOrder && (
+        <PaymentEditModal
+          order={editingPaymentOrder}
+          currency={c}
+          onSave={handlePaymentSave}
+          onClose={() => setEditingPaymentOrder(null)}
+        />
+      )}
     </div>
   );
 }
-
