@@ -72,10 +72,12 @@ async function generateKOTNo() {
   const { getBusinessDayBoundary } = require('../lib/businessDay');
   const boundary = getBusinessDayBoundary();
 
-  // Format business day date string, e.g. "2026-06-09"
-  const yyyy = boundary.getFullYear();
-  const mm = String(boundary.getMonth() + 1).padStart(2, '0');
-  const dd = String(boundary.getDate()).padStart(2, '0');
+  // Format business day date string using IST calendar fields, e.g. "2026-06-09"
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+  const istBoundary = new Date(boundary.getTime() + IST_OFFSET_MS);
+  const yyyy = istBoundary.getUTCFullYear();
+  const mm = String(istBoundary.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(istBoundary.getUTCDate()).padStart(2, '0');
   const dateStr = `${yyyy}-${mm}-${dd}`;
 
   const kotCounterKey = `kot_seq:${dateStr}`;
