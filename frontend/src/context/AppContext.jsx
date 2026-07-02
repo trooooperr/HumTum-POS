@@ -394,7 +394,7 @@ export function AppProvider({ children }) {
     // Print kitchen KOT first (if any)
     if (kitchenItems.length > 0) {
       firePrint(
-        buildKOTHtml(kot, tableNo, kitchenItems, settings.kitchenPrinterName || 'KITCHEN'),
+        buildKOTHtml(kot, tableNo, kitchenItems, 'KITCHEN'),
         'document',
         settings.kitchenPrinterName || ''
       );
@@ -404,7 +404,7 @@ export function AppProvider({ children }) {
     if (barItems.length > 0) {
       setTimeout(() => {
         firePrint(
-          buildKOTHtml(kot, tableNo, barItems, settings.barPrinterName || 'BAR'),
+          buildKOTHtml(kot, tableNo, barItems, 'BAR'),
           'document',
           settings.barPrinterName || ''
         );
