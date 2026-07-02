@@ -315,10 +315,10 @@ function executePrintJob(job) {
           clearInterval(checkInterval);
           log(`PDF generated. Sending to printer: "${job.printerName}" via SumatraPDF...`);
           
-          // Step 2: Send PDF to printer using SumatraPDF
+                  // Step 2: Send PDF to printer using SumatraPDF
           const sumatraArgs = [
             '-print-to', job.printerName,
-            '-print-settings', 'noscale,noprompt',
+            '-print-settings', 'portrait,noscale,noprompt',
             tempPdfFile
           ];
           

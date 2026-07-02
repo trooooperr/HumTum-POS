@@ -347,7 +347,7 @@ export function AppProvider({ children }) {
 
   const buildKOTHtml = useCallback((kot, tableNo, items, printerLabel) => {
     const itemCount = items.length;
-    const pageHeight = 70 + (itemCount * 9);
+    const pageHeight = Math.max(105, 70 + (itemCount * 9));
     return `
     <html>
       <head>
