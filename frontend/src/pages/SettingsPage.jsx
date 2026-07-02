@@ -432,8 +432,9 @@ export default function SettingsPage() {
                     <label>Agent Port</label>
                     <input 
                       type="number" 
+                      disabled
                       value={form.printAgentPort || 5001} 
-                      onChange={e => set('printAgentPort', parseInt(e.target.value) || 5001)} 
+                      style={{ background: 'var(--b3)', cursor: 'not-allowed' }}
                     />
                   </div>
                   <div className="settings-field" style={{ flex: 2, minWidth: '250px' }}>
