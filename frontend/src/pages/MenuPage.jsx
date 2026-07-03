@@ -117,15 +117,22 @@ function ItemModal({ item, onClose, onSave }) {
               <option value="bar">Bar</option>
             </select>
           </div>
+          <div className="fgroup"><label className="lbl">Food Type</label>
+            <select value={form.isVeg ? 'veg' : 'non-veg'} onChange={e => setForm({ ...form, isVeg: e.target.value === 'veg' })}>
+              <option value="veg">Veg</option>
+              <option value="non-veg">Non-Veg</option>
+            </select>
+          </div>
+        </div>
+        <div className="frow2">
           <div className="fgroup"><label className="lbl">Shortcut</label>
             <input value={form.shortcut} onChange={e => setForm({ ...form, shortcut: e.target.value.toLowerCase().trim() })}
               placeholder="e.g. cp, pn, ff" maxLength={10} />
           </div>
-        </div>
-        {/* IMAGE URL INPUT ADDED HERE */}
-        <div className="fgroup"><label className="lbl">Image URL</label>
-          <input value={form.imageUrl} onChange={e => setForm({ ...form, imageUrl: e.target.value })}
-            placeholder="https://images.unsplash.com/photo..." />
+          <div className="fgroup"><label className="lbl">Image URL</label>
+            <input value={form.imageUrl} onChange={e => setForm({ ...form, imageUrl: e.target.value })}
+              placeholder="https://images.unsplash.com/photo..." />
+          </div>
         </div>
         <div style={{ borderTop: '1px solid var(--b1)', paddingTop: '15px', marginTop: '15px' }}>
           <div className="menu-availability-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
