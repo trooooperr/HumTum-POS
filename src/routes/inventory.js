@@ -78,7 +78,7 @@ router.post(
   },
   async (req, res) => {
     try {
-      const { name, category, unit, stock, minStock, price, isAlcoholic, trackStock } = req.body;
+      const { name, category, unit, stock, minStock, price, isAlcoholic, trackStock, linkInventoryId, stockDeductionQty } = req.body;
       const shortcut = (req.body.shortcut || '').toLowerCase().trim();
       const invItem = new Inventory({
         name,
@@ -90,9 +90,15 @@ router.post(
         shortcut,
         isAlcoholic: !!isAlcoholic,
         isAlcohol: !!isAlcoholic,
-        trackStock: trackStock !== false
+        trackStock: trackStock !== false,
+        linkInventoryId: linkInventoryId || null,
+        stockDeductionQty: stockDeductionQty || 1
       });
       const savedInv = await invItem.save();
+      if (savedInv.linkInventoryId) {
+        const { syncChildStocks } = require('../lib/inventoryStock');
+        await syncChildStocks([savedInv.linkInventoryId]);
+      }
       await MenuItem.findOneAndUpdate(
         { name },
         { name, category, price, available: trackStock === false ? true : (stock > 0), shortcut, department: 'bar' },
@@ -168,6 +174,12 @@ router.put(
         { new: true, runValidators: true }
       );
       if (!updated) return res.status(404).json({ message: 'Item not found' });
+      const { syncChildStocks } = require('../lib/inventoryStock');
+      if (updated.linkInventoryId) {
+        await syncChildStocks([updated.linkInventoryId]);
+      } else {
+        await syncChildStocks([updated._id]);
+      }
       await MenuItem.findOneAndUpdate(
         { name: updated.name },
         {
@@ -202,11 +214,26 @@ router.patch('/:id/stock', requireRole(['admin', 'manager']), async (req, res) =
     const { quantityChange } = req.body;
     const item = await Inventory.findById(req.params.id);
     if (!item) return res.status(404).json({ message: 'Item not found' });
-    item.stock = Math.max(0, item.stock + quantityChange);
-    const updated = await item.save();
-    // Sync child stocks if this is a parent inventory item
+
+    let finalUpdatedItem;
     const { syncChildStocks } = require('../lib/inventoryStock');
-    await syncChildStocks([updated._id]);
+
+    if (item.linkInventoryId) {
+      const parent = await Inventory.findById(item.linkInventoryId);
+      if (parent) {
+        const change = quantityChange * (item.stockDeductionQty || 1);
+        parent.stock = Math.max(0, parent.stock + change);
+        await parent.save();
+        await syncChildStocks([parent._id]);
+      }
+      finalUpdatedItem = await Inventory.findById(item._id).populate('linkInventoryId');
+    } else {
+      item.stock = Math.max(0, item.stock + quantityChange);
+      const saved = await item.save();
+      await syncChildStocks([saved._id]);
+      finalUpdatedItem = saved;
+    }
+
     // Sync menu item availability
     await updateMenuAvailability();
     await deleteCache([INVENTORY_CACHE_KEY, MENU_CACHE_KEY]);
@@ -216,7 +243,7 @@ router.patch('/:id/stock', requireRole(['admin', 'manager']), async (req, res) =
       const allInv = await sortInventoryItems(allInvRaw);
       req.app.locals.io.emit('INVENTORY_UPDATED', { inventory: allInv, timestamp: new Date() });
     }
-    res.json(updated);
+    res.json(finalUpdatedItem);
   } catch (err) {
     console.error('INVENTORY STOCK UPDATE ERROR:', err.message);
     res.status(400).json({ message: err.message });

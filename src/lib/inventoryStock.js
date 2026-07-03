@@ -5,8 +5,12 @@ const { deleteCache } = require('./redis');
 const INVENTORY_CACHE_KEY = 'inventory:all';
 const MENU_CACHE_KEY = 'menu:all';
 
+function normalizeName(name) {
+  return (name || '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
 function itemKey(item) {
-  return (item?.name || '').trim();
+  return normalizeName(item?.name);
 }
 
 function aggregateQuantities(items = []) {
@@ -42,10 +46,13 @@ function itemsFromQuantityMap(quantities) {
 }
 
 async function updateMenuAvailability() {
-  const inventoryItems = await Inventory.find();
+  const [inventoryItems, menuItems] = await Promise.all([
+    Inventory.find(),
+    MenuItem.find()
+  ]);
   const inventoryById = new Map(inventoryItems.map(i => [i._id.toString(), i]));
 
-  const ops = [];
+  const availabilityMap = new Map();
   for (const item of inventoryItems) {
     let isAvailable = true;
     if (item.linkInventoryId) {
@@ -58,13 +65,22 @@ async function updateMenuAvailability() {
         isAvailable = item.stock > 0;
       }
     }
-    ops.push({
-      updateOne: {
-        filter: { name: item.name },
-        update: { $set: { available: isAvailable } }
-      }
-    });
+    availabilityMap.set(normalizeName(item.name), isAvailable);
   }
+
+  const ops = [];
+  for (const mItem of menuItems) {
+    const normName = normalizeName(mItem.name);
+    if (availabilityMap.has(normName)) {
+      ops.push({
+        updateOne: {
+          filter: { _id: mItem._id },
+          update: { $set: { available: availabilityMap.get(normName) } }
+        }
+      });
+    }
+  }
+
   if (ops.length) {
     await MenuItem.bulkWrite(ops, { ordered: false });
   }
@@ -103,17 +119,17 @@ async function deductInventoryForItems(items = []) {
   const names = [...quantities.keys()];
   if (!names.length) return getInventorySnapshot();
 
-  // Case-insensitive lookup: build regex for each name so "Beer Bucket",
-  // "beer bucket" and "BEER BUCKET" all find the same inventory document.
-  const nameRegexes = names.map(n => new RegExp(`^${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'));
+  const nameRegexes = names.map(n => {
+    const escaped = n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const spaced = escaped.replace(/ /g, '\\s+');
+    return new RegExp(`^${spaced}$`, 'i');
+  });
   const directInvItems = await Inventory.find({ name: { $in: nameRegexes } });
 
   const parentIds = directInvItems
     .filter(i => i.linkInventoryId)
     .map(i => i.linkInventoryId);
 
-  // Fetch parents explicitly by ID so they are always included even if their
-  // name doesn't appear in the KOT item list.
   const allMatching = await Inventory.find({
     $or: [
       { name: { $in: nameRegexes } },
@@ -122,12 +138,12 @@ async function deductInventoryForItems(items = []) {
   });
 
   const inventoryById = new Map(allMatching.map(i => [i._id.toString(), i]));
-  const inventoryByName = new Map(allMatching.map(i => [i.name.trim().toLowerCase(), i]));
+  const inventoryByName = new Map(allMatching.map(i => [normalizeName(i.name), i]));
 
   const ops = [];
   const affectedParentIds = [];
   for (const [name, quantity] of quantities.entries()) {
-    const directInv = inventoryByName.get(name.trim().toLowerCase());
+    const directInv = inventoryByName.get(normalizeName(name));
     if (!directInv) continue;
 
     if (directInv.linkInventoryId) {
@@ -154,6 +170,7 @@ async function deductInventoryForItems(items = []) {
             ]
           }
         });
+        affectedParentIds.push(directInv._id);
       }
     }
   }
@@ -161,9 +178,14 @@ async function deductInventoryForItems(items = []) {
   if (ops.length) {
     await Inventory.bulkWrite(ops, { ordered: false });
   }
-  // Sync child stocks after parent changes (use deduplicated parent IDs)
-  const uniqueParentIds = [...new Set([...parentIds.map(id => id.toString()), ...affectedParentIds.map(id => id.toString())])]
-    .map(id => { const mongoose = require('mongoose'); return new mongoose.Types.ObjectId(id); });
+
+  const uniqueParentIds = [...new Set([
+    ...parentIds.map(id => id.toString()),
+    ...affectedParentIds.map(id => id.toString())
+  ])].map(id => {
+    const mongoose = require('mongoose');
+    return new mongoose.Types.ObjectId(id);
+  });
   await syncChildStocks(uniqueParentIds);
   await updateMenuAvailability();
   await deleteCache([INVENTORY_CACHE_KEY, MENU_CACHE_KEY]);
@@ -196,8 +218,11 @@ async function refundInventoryForItems(items = []) {
   const names = [...quantities.keys()];
   if (!names.length) return getInventorySnapshot();
 
-  // Case-insensitive lookup (same fix as deductInventoryForItems)
-  const nameRegexes = names.map(n => new RegExp(`^${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'));
+  const nameRegexes = names.map(n => {
+    const escaped = n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const spaced = escaped.replace(/ /g, '\\s+');
+    return new RegExp(`^${spaced}$`, 'i');
+  });
   const directInvItems = await Inventory.find({ name: { $in: nameRegexes } });
 
   const parentIds = directInvItems
@@ -212,11 +237,12 @@ async function refundInventoryForItems(items = []) {
   });
 
   const inventoryById = new Map(allMatching.map(i => [i._id.toString(), i]));
-  const inventoryByName = new Map(allMatching.map(i => [i.name.trim().toLowerCase(), i]));
+  const inventoryByName = new Map(allMatching.map(i => [normalizeName(i.name), i]));
 
   const ops = [];
+  const affectedParentIds = [];
   for (const [name, quantity] of quantities.entries()) {
-    const directInv = inventoryByName.get(name.trim().toLowerCase());
+    const directInv = inventoryByName.get(normalizeName(name));
     if (!directInv) continue;
 
     if (directInv.linkInventoryId) {
@@ -229,6 +255,7 @@ async function refundInventoryForItems(items = []) {
             update: { $inc: { stock: refundQty } }
           }
         });
+        affectedParentIds.push(parentInv._id);
       }
     } else {
       if (directInv.trackStock !== false) {
@@ -238,6 +265,7 @@ async function refundInventoryForItems(items = []) {
             update: { $inc: { stock: quantity } }
           }
         });
+        affectedParentIds.push(directInv._id);
       }
     }
   }
@@ -245,8 +273,15 @@ async function refundInventoryForItems(items = []) {
   if (ops.length) {
     await Inventory.bulkWrite(ops, { ordered: false });
   }
-  // Sync child stocks after refund
-  await syncChildStocks(parentIds);
+
+  const uniqueParentIds = [...new Set([
+    ...parentIds.map(id => id.toString()),
+    ...affectedParentIds.map(id => id.toString())
+  ])].map(id => {
+    const mongoose = require('mongoose');
+    return new mongoose.Types.ObjectId(id);
+  });
+  await syncChildStocks(uniqueParentIds);
   await updateMenuAvailability();
   await deleteCache([INVENTORY_CACHE_KEY, MENU_CACHE_KEY]);
   return getInventorySnapshot();

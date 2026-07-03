@@ -618,7 +618,15 @@ export default function InventoryPage() {
                 {(provided) => (
                   <tbody ref={provided.innerRef} {...provided.droppableProps}>
                     {filtered.map((i, index) => {
-                      const s = getStatus(i);
+                      const effectiveStock = (() => {
+                        if (i.linkInventoryId) {
+                          const parentId = typeof i.linkInventoryId === 'object' ? i.linkInventoryId._id : i.linkInventoryId;
+                          const parent = inventory.find(p => p._id === parentId);
+                          return parent ? parent.stock : i.stock;
+                        }
+                        return i.stock;
+                      })();
+                      const s = getStatus({ ...i, stock: effectiveStock });
                       return (
                         <Draggable key={i._id} draggableId={i._id} index={index} isDragDisabled={!isAdmin || !!search}>
                           {(provided) => (
