@@ -189,8 +189,9 @@ router.post('/', async (req, res) => {
     try {
       // Determine request source (default to 'pos')
       const kotSource = req.body.source || 'pos';
-      // Deduct inventory only for POS-initiated KOTs and only if order is not a direct device order
-      if (!order.inventoryFinalized && kotSource === 'pos') {
+      // Deduct inventory only for POS-initiated KOTs and only if order is not a direct device order or already has items
+      const isAlreadyDeducted = order.inventoryFinalized || (order.isActive && order.items && order.items.length > 0);
+      if (!isAlreadyDeducted && kotSource === 'pos') {
         updatedInventory = await deductInventoryForItems(items);
         saved.inventoryDeducted = true;
         saved.inventoryDeductedAt = new Date();

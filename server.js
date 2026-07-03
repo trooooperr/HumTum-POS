@@ -419,8 +419,9 @@ function setupDbChangeStreams(io) {
               const kotDoc = await KOT.findById(doc._id);
               if (kotDoc && !kotDoc.inventoryDeductedAt) {
                 const order = await Order.findById(kotDoc.orderId);
-                if (order && order.inventoryFinalized) {
-                  console.log(`📡 Change Stream: Order ${order._id} is already inventoryFinalized. Skipping KOT ${kotDoc.kotNo} stock deduction.`);
+                const isAlreadyDeducted = order && (order.inventoryFinalized || (order.isActive && order.items && order.items.length > 0));
+                if (isAlreadyDeducted) {
+                  console.log(`📡 Change Stream: Order is already finalized or has active items. Skipping KOT ${kotDoc.kotNo} stock deduction.`);
                   kotDoc.inventoryDeducted = true;
                   kotDoc.inventoryDeductedAt = new Date();
                   await kotDoc.save();
