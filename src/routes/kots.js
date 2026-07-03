@@ -186,17 +186,21 @@ router.post('/', async (req, res) => {
     const saved = await kot.save();
 
     let updatedInventory = null;
-    try {
-      updatedInventory = await deductInventoryForItems(items);
-      saved.inventoryDeducted = true;
-      saved.inventoryDeductedAt = new Date();
-      await saved.save();
-      broadcastInventoryUpdate(req, updatedInventory, {
-        orderId,
-        kotId: saved._id,
-        source: 'KOT'
-      });
-    } catch (inventoryErr) {
+      try {
+        // If the order's inventory was already finalized (e.g., direct order from customer device),
+        // skip deduction here to avoid double decrement.
+        if (!order.inventoryFinalized) {
+          updatedInventory = await deductInventoryForItems(items);
+          saved.inventoryDeducted = true;
+          saved.inventoryDeductedAt = new Date();
+          await saved.save();
+          broadcastInventoryUpdate(req, updatedInventory, {
+            orderId,
+            kotId: saved._id,
+            source: 'KOT'
+          });
+        }
+      } catch (inventoryErr) {
       console.error('Inventory deduction error in POST /api/kots:', inventoryErr.message);
     }
 
