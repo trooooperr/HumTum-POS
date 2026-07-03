@@ -247,33 +247,28 @@ async function refundInventoryForItems(items = []) {
 
   const ops = [];
   const affectedParentIds = [];
+  const parentRefundMap = new Map(); // targetId -> total refund quantity
+
   for (const [name, quantity] of quantities.entries()) {
     const directInv = inventoryByName.get(normalizeName(name));
     if (!directInv) continue;
 
-    if (directInv.linkInventoryId) {
-      const parentInv = inventoryById.get(directInv.linkInventoryId.toString());
-      if (parentInv && parentInv.trackStock !== false) {
-        const refundQty = getEffectiveDeduction(directInv, quantity);
-        ops.push({
-          updateOne: {
-            filter: { _id: parentInv._id },
-            update: { $inc: { stock: refundQty } }
-          }
-        });
-        affectedParentIds.push(parentInv._id);
+    const targetId = directInv.linkInventoryId ? directInv.linkInventoryId.toString() : directInv._id.toString();
+    const refundQty = directInv.linkInventoryId ? getEffectiveDeduction(directInv, quantity) : quantity;
+    const prev = parentRefundMap.get(targetId) || 0;
+    parentRefundMap.set(targetId, prev + refundQty);
+  }
+
+  for (const [invId, totalRefund] of parentRefundMap.entries()) {
+    const inv = inventoryById.get(invId);
+    if (!inv || inv.trackStock === false) continue;
+    ops.push({
+      updateOne: {
+        filter: { _id: inv._id },
+        update: { $inc: { stock: totalRefund } }
       }
-    } else {
-      if (directInv.trackStock !== false) {
-        ops.push({
-          updateOne: {
-            filter: { _id: directInv._id },
-            update: { $inc: { stock: quantity } }
-          }
-        });
-        affectedParentIds.push(directInv._id);
-      }
-    }
+    });
+    affectedParentIds.push(inv._id);
   }
 
   if (ops.length) {

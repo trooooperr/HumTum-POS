@@ -189,20 +189,17 @@ router.post('/', async (req, res) => {
     try {
       // Determine request source (default to 'pos')
       const kotSource = req.body.source || 'pos';
-      // Deduct inventory only for POS-initiated KOTs and only if order is not a direct device order and no prior KOT has already deducted inventory
+      // Deduct inventory only for POS-initiated KOTs and only if order is not a direct device order
       if (!order.inventoryFinalized && kotSource === 'pos') {
-        const priorDeduction = await KOT.findOne({ orderId, inventoryDeducted: true });
-        if (!priorDeduction) {
-          updatedInventory = await deductInventoryForItems(items);
-          saved.inventoryDeducted = true;
-          saved.inventoryDeductedAt = new Date();
-          await saved.save();
-          broadcastInventoryUpdate(req, updatedInventory, {
-            orderId,
-            kotId: saved._id,
-            source: kotSource
-          });
-        }
+        updatedInventory = await deductInventoryForItems(items);
+        saved.inventoryDeducted = true;
+        saved.inventoryDeductedAt = new Date();
+        await saved.save();
+        broadcastInventoryUpdate(req, updatedInventory, {
+          orderId,
+          kotId: saved._id,
+          source: kotSource
+        });
       }
     } catch (inventoryErr) {
       console.error('Inventory deduction error in POST /api/kots:', inventoryErr.message);
