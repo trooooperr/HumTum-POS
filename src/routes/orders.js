@@ -330,7 +330,7 @@ router.patch('/:id/finalize-bill', async (req, res) => {
     order.grandTotal = grandTotal;
     order.orderStatus = 'COMPLETED';
     order.isActive = false;
-    order.date = new Date();
+    order.date = getBusinessDate(new Date());
     if (waiterName !== undefined) order.waiterName = waiterName;
     if (orderType !== undefined) order.orderType = orderType;
     if (customerName !== undefined) order.customerName = customerName;
@@ -418,7 +418,7 @@ router.patch('/:id/settle', async (req, res) => {
     if (order.dueAmount <= 0) {
       order.orderStatus = 'PAID';
       order.isActive = false;
-      order.date = new Date();
+      order.date = getBusinessDate(new Date());
       if (!order.billNo || order.billNo === 'PENDING') {
         order.billNo = await generateNextBillNo();
       }
@@ -462,7 +462,7 @@ router.patch('/:id/complete', async (req, res) => {
     // Mark order as completed
     order.orderStatus = 'COMPLETED';
     order.isActive = false;
-    order.date = new Date();
+    order.date = getBusinessDate(new Date());
     if (!order.billNo || order.billNo === 'PENDING') {
       order.billNo = await generateNextBillNo();
     }
