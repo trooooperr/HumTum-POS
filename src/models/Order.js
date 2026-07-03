@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const orderSchema = new mongoose.Schema({
-  billNo:        { type: String, required: true, index: true },
+  billNo:        { type: String, default: '', index: true },
   date:          { type: Date, default: Date.now, index: true },
   grandTotal:    { type: Number, required: true },
   paidAmount:    { type: Number, default: 0 },

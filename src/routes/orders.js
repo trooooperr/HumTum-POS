@@ -27,18 +27,22 @@ function getBusinessDate(originalDate = new Date()) {
 }
 
 // Generate new Bill No based on boundary
+// Generate new Bill No based on boundary (only includes orders that have a valid bill number suffix)
 async function generateNextBillNo() {
   const boundary = getBusinessDayBoundary();
-  const latestOrder = await Order.findOne({ createdAt: { $gte: boundary } })
-    .sort({ createdAt: -1 })
-    .select('billNo');
-    
+  // Fetch all orders from today that have a valid billNo format
+  const todayOrders = await Order.find({
+    createdAt: { $gte: boundary },
+    billNo: { $regex: /^HTB-\d+$/ }
+  }).select('billNo');
+
   let nextNumber = 1;
-  if (latestOrder && latestOrder.billNo) {
-    const match = latestOrder.billNo.match(/HTB-(\d+)/);
-    if (match) {
-      nextNumber = parseInt(match[1], 10) + 1;
-    }
+  if (todayOrders.length > 0) {
+    const numbers = todayOrders.map(o => {
+      const match = o.billNo.match(/HTB-(\d+)/);
+      return match ? parseInt(match[1], 10) : 0;
+    });
+    nextNumber = Math.max(...numbers) + 1;
   }
   return `HTB-${nextNumber.toString().padStart(3, '0')}`;
 }
@@ -94,12 +98,9 @@ router.post('/table/:tableNo/open', async (req, res) => {
     // Clean up any old completed sessions for this table to prevent Duplicate Key errors
     await TableSession.deleteMany({ tableNo: parseInt(tableNo), status: 'COMPLETED' });
 
-    // Generate sequential bill number based on daily 3 AM boundary
-    const billNo = await generateNextBillNo();
-
-    // Create initial order
+    // Create initial order with empty billNo (generated only on finalization)
     const order = new Order({
-      billNo,
+      billNo: '',
       tableNo: parseInt(tableNo),
       items: [],
       subtotal: 0,
@@ -226,13 +227,18 @@ router.put('/table/:tableNo/session', async (req, res) => {
   }
 });
 
-// ── CREATE ORDER (called when opening table) ────────────────────
+// ── CREATE ORDER (called when opening table or direct orders) ────────────────────
 router.post('/', async (req, res) => {
   try {
     const orderData = req.body;
 
-    // Generate sequential bill number based on daily 3 AM boundary
-    orderData.billNo = await generateNextBillNo();
+    // Assign sequential bill number only if the order is already marked as finalized/inactive or completed
+    const isCompleted = orderData.isActive === false || orderData.orderStatus === 'COMPLETED' || (orderData.dueAmount === 0 && Array.isArray(orderData.items) && orderData.items.length > 0);
+    if (isCompleted) {
+      orderData.billNo = await generateNextBillNo();
+    } else {
+      orderData.billNo = '';
+    }
     
     const isDirectOrder = Array.isArray(orderData.items) && orderData.items.length > 0;
 
@@ -241,7 +247,7 @@ router.post('/', async (req, res) => {
       ...orderData,
       date: getBusinessDate(orderData.date ? new Date(orderData.date) : new Date()),
       orderStatus: orderData.orderStatus || (isDirectOrder ? (orderData.dueAmount === 0 ? 'COMPLETED' : 'OPEN') : 'OPEN'),
-      isActive: true,
+      isActive: orderData.isActive !== undefined ? orderData.isActive : true,
       items: orderData.items || [],
       inventoryFinalized: isDirectOrder,
       ...(isDirectOrder && { inventoryFinalizedAt: new Date() })
@@ -332,6 +338,11 @@ router.patch('/:id/finalize-bill', async (req, res) => {
     if (cashAmount !== undefined) order.cashAmount = parseFloat(cashAmount) || 0;
     if (upiAmount !== undefined) order.upiAmount = parseFloat(upiAmount) || 0;
 
+    // Generate and assign sequential bill number at checkout
+    if (!order.billNo || order.billNo === 'PENDING') {
+      order.billNo = await generateNextBillNo();
+    }
+
     const saved = await order.save();
 
     let updatedInventory = null;
@@ -406,6 +417,9 @@ router.patch('/:id/settle', async (req, res) => {
     if (order.dueAmount <= 0) {
       order.orderStatus = 'PAID';
       order.isActive = false;
+      if (!order.billNo || order.billNo === 'PENDING') {
+        order.billNo = await generateNextBillNo();
+      }
     }
     
     const saved = await order.save();
@@ -446,6 +460,9 @@ router.patch('/:id/complete', async (req, res) => {
     // Mark order as completed
     order.orderStatus = 'COMPLETED';
     order.isActive = false;
+    if (!order.billNo || order.billNo === 'PENDING') {
+      order.billNo = await generateNextBillNo();
+    }
     const saved = await order.save();
 
     // Mark table session as completed and delete it to free the table index
