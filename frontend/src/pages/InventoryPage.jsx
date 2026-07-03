@@ -108,8 +108,10 @@ function StockModal({ item, onClose, onSave }) {
     let linkInventoryId = null;
     let stockDeductionQty = 1;
 
-    if (form.trackStock && form.linkInventoryId) {
-      linkInventoryId = form.linkInventoryId;
+    if (form.trackStock) {
+      if (form.linkInventoryId) {
+        linkInventoryId = form.linkInventoryId;
+      }
       const parsedVal = form.stockDeductionQty;
       let finalQty = 1;
       
@@ -150,6 +152,7 @@ function StockModal({ item, onClose, onSave }) {
       }
       stockDeductionQty = finalQty;
     }
+
 
     const data = {
       ...form,
