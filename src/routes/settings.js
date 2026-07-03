@@ -225,4 +225,90 @@ router.put('/', requireRole(['admin', 'manager']), async (req, res) => {
   res.json(normalized);
 });
 
+// Rename Inventory Category (Admin/Manager)
+router.patch('/inventory-category/rename', requireRole(['admin', 'manager']), async (req, res) => {
+  try {
+    const { oldCategory, newCategory } = req.body;
+    const cleanOld = cleanString(oldCategory);
+    const cleanNew = cleanString(newCategory);
+
+    if (!cleanOld || !cleanNew) {
+      return res.status(400).json({ message: 'Both old and new categories are required' });
+    }
+
+    const settings = await getOrCreateSettings();
+    let categories = cleanCategoryList(settings.inventoryCategories) || [];
+    const idx = categories.indexOf(cleanOld);
+
+    if (idx === -1) {
+      return res.status(404).json({ message: 'Category not found' });
+    }
+
+    // Prevent duplicates
+    if (categories.includes(cleanNew) && cleanOld.toLowerCase() !== cleanNew.toLowerCase()) {
+      return res.status(400).json({ message: 'New category already exists' });
+    }
+
+    categories[idx] = cleanNew;
+    settings.inventoryCategories = categories;
+    settings.senderEmail = FIXED_SENDER_EMAIL;
+    await settings.save();
+
+    // Update all Inventory documents
+    const Inventory = require('../models/Inventory');
+    await Inventory.updateMany({ category: cleanOld }, { category: cleanNew });
+
+    // Invalidate Cache
+    await deleteCache([SETTINGS_CACHE_KEY, 'inventory:all']);
+
+    res.json(settings.inventoryCategories);
+  } catch (err) {
+    console.error('Rename Inventory Category Error:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Rename Menu Category (Admin/Manager)
+router.patch('/menu-category/rename', requireRole(['admin', 'manager']), async (req, res) => {
+  try {
+    const { oldCategory, newCategory } = req.body;
+    const cleanOld = cleanString(oldCategory);
+    const cleanNew = cleanString(newCategory);
+
+    if (!cleanOld || !cleanNew) {
+      return res.status(400).json({ message: 'Both old and new categories are required' });
+    }
+
+    const settings = await getOrCreateSettings();
+    let categories = cleanCategoryList(settings.menuCategories) || [];
+    const idx = categories.indexOf(cleanOld);
+
+    if (idx === -1) {
+      return res.status(404).json({ message: 'Category not found' });
+    }
+
+    // Prevent duplicates
+    if (categories.includes(cleanNew) && cleanOld.toLowerCase() !== cleanNew.toLowerCase()) {
+      return res.status(400).json({ message: 'New category already exists' });
+    }
+
+    categories[idx] = cleanNew;
+    settings.menuCategories = categories;
+    settings.senderEmail = FIXED_SENDER_EMAIL;
+    await settings.save();
+
+    // Update all MenuItem documents
+    const MenuItem = require('../models/MenuItem');
+    await MenuItem.updateMany({ category: cleanOld }, { category: cleanNew });
+
+    // Invalidate Cache
+    await deleteCache([SETTINGS_CACHE_KEY, 'menu:all']);
+
+    res.json(settings.menuCategories);
+  } catch (err) {
+    console.error('Rename Menu Category Error:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;

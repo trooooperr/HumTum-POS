@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { Save, Check, Send, KeyRound, ShieldAlert, Users, Trash2, RefreshCw, GripVertical } from 'lucide-react';
 import { apiUrl, authFetch } from '../lib/api';
@@ -24,6 +24,68 @@ export default function SettingsPage() {
   const { showToast } = useApp();
   const [fetchingPrinters, setFetchingPrinters] = useState(false);
   const [testingPrinter, setTestingPrinter] = useState(null);
+
+  const [editingMenuCat, setEditingMenuCat] = useState(null);
+  const [editingInvCat, setEditingInvCat] = useState(null);
+  const [editCatVal, setEditCatVal] = useState('');
+  // Ref to detect double‑tap on touch devices
+  const lastTapRef = useRef(0);
+
+  const handleRenameMenuCategory = async (oldCat, newCat) => {
+    const trimmed = newCat.trim();
+    if (!trimmed) {
+      setEditingMenuCat(null);
+      return;
+    }
+    if (trimmed === oldCat) {
+      setEditingMenuCat(null);
+      return;
+    }
+    try {
+      const res = await authFetch(apiUrl('/api/settings/menu-category/rename'), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oldCategory: oldCat, newCategory: trimmed })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to rename category');
+      setForm(f => ({ ...f, menuCategories: data }));
+      setSettings(s => ({ ...s, menuCategories: data }));
+      showToast(`Category renamed to ${trimmed}`, 'success');
+    } catch (e) {
+      showToast(e.message, 'error');
+    } finally {
+      setEditingMenuCat(null);
+    }
+  };
+
+  const handleRenameInvCategory = async (oldCat, newCat) => {
+    const trimmed = newCat.trim();
+    if (!trimmed) {
+      setEditingInvCat(null);
+      return;
+    }
+    if (trimmed === oldCat) {
+      setEditingInvCat(null);
+      return;
+    }
+    try {
+      const res = await authFetch(apiUrl('/api/settings/inventory-category/rename'), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oldCategory: oldCat, newCategory: trimmed })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to rename category');
+      setForm(f => ({ ...f, inventoryCategories: data }));
+      setSettings(s => ({ ...s, inventoryCategories: data }));
+      showToast(`Category renamed to ${trimmed}`, 'success');
+    } catch (e) {
+      showToast(e.message, 'error');
+    } finally {
+      setEditingInvCat(null);
+    }
+  };
   
   const handleDetectPrinters = async () => {
     setFetchingPrinters(true);
@@ -600,7 +662,38 @@ export default function SettingsPage() {
                 {index > 0 && (
                   <button type="button" className="arrow-btn" onClick={() => handleShiftMenuCategory(index, 'left')} title="Move left">◀</button>
                 )}
-                <span className="cat-name">{cat}</span>
+                {editingMenuCat === cat ? (
+                  <input
+                    type="text"
+                    value={editCatVal}
+                    onChange={e => setEditCatVal(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleRenameMenuCategory(cat, editCatVal);
+                      if (e.key === 'Escape') setEditingMenuCat(null);
+                    }}
+                    onBlur={() => handleRenameMenuCategory(cat, editCatVal)}
+                    autoFocus
+                    className="category-rename-input"
+                    style={{ background: 'var(--b2)', border: '1px solid var(--a)', borderRadius: '4px', color: 'var(--t0)', padding: '2px 6px', fontSize: '13px', width: '120px' }}
+                  />
+                ) : (
+                  <span 
+                    className="cat-name"
+                    onDoubleClick={() => { setEditingMenuCat(cat); setEditCatVal(cat); }}
+                    onTouchStart={() => {
+                      const now = Date.now();
+                      if (now - lastTapRef.current < 300) {
+                        setEditingMenuCat(cat);
+                        setEditCatVal(cat);
+                      }
+                      lastTapRef.current = now;
+                    }}
+                    title="Double-click or double‑tap to rename"
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {cat}
+                  </span>
+                )}
                 {index < menuCategories.length - 1 && (
                   <button type="button" className="arrow-btn" onClick={() => handleShiftMenuCategory(index, 'right')} title="Move right">▶</button>
                 )}
@@ -629,7 +722,38 @@ export default function SettingsPage() {
                 {index > 0 && (
                   <button type="button" className="arrow-btn" onClick={() => handleShiftInvCategory(index, 'left')} title="Move left">◀</button>
                 )}
-                <span className="cat-name">{cat}</span>
+                {editingInvCat === cat ? (
+                  <input
+                    type="text"
+                    value={editCatVal}
+                    onChange={e => setEditCatVal(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleRenameInvCategory(cat, editCatVal);
+                      if (e.key === 'Escape') setEditingInvCat(null);
+                    }}
+                    onBlur={() => handleRenameInvCategory(cat, editCatVal)}
+                    autoFocus
+                    className="category-rename-input"
+                    style={{ background: 'var(--b2)', border: '1px solid var(--a)', borderRadius: '4px', color: 'var(--t0)', padding: '2px 6px', fontSize: '13px', width: '120px' }}
+                  />
+                ) : (
+                  <span 
+                    className="cat-name"
+                    onDoubleClick={() => { setEditingInvCat(cat); setEditCatVal(cat); }}
+                    onTouchStart={() => {
+                      const now = Date.now();
+                      if (now - lastTapRef.current < 300) {
+                        setEditingInvCat(cat);
+                        setEditCatVal(cat);
+                      }
+                      lastTapRef.current = now;
+                    }}
+                    title="Double-click or double‑tap to rename"
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {cat}
+                  </span>
+                )}
                 {index < invCategories.length - 1 && (
                   <button type="button" className="arrow-btn" onClick={() => handleShiftInvCategory(index, 'right')} title="Move right">▶</button>
                 )}
