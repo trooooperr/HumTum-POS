@@ -189,8 +189,8 @@ router.post('/', async (req, res) => {
     try {
       // Determine request source (default to 'pos')
       const kotSource = req.body.source || 'pos';
-      // Deduct inventory only for POS-initiated KOTs
-      if (kotSource === 'pos') {
+      // Deduct inventory only if the order has not been finalized (i.e., not a direct order from customer device)
+      if (!order.inventoryFinalized) {
         updatedInventory = await deductInventoryForItems(items);
         saved.inventoryDeducted = true;
         saved.inventoryDeductedAt = new Date();
@@ -201,6 +201,7 @@ router.post('/', async (req, res) => {
           source: kotSource
         });
       }
+
     } catch (inventoryErr) {
       console.error('Inventory deduction error in POST /api/kots:', inventoryErr.message);
     }
