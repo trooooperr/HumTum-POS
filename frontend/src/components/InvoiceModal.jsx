@@ -103,7 +103,7 @@ export default function InvoiceModal() {
           <div class="dash-line"></div>
 
           <div class="row"><span>BILL: HTB-${(o.billNo || '').split('-').pop()}</span><span>TABLE: ${o.tableNo}</span></div>
-          <div class="row" style="font-size: 11px;">DATE: ${new Date(o.date).toLocaleString('en-IN')}</div>
+          <div class="row" style="font-size: 11px;">DATE: ${new Date(o.createdAt || o.date).toLocaleString('en-IN')}</div>
           ${o.waiterName ? `<div class="row" style="font-size: 11px;">WAITER: ${o.waiterName.toUpperCase()}</div>` : ''}
 
           <div class="dash-line"></div>
@@ -262,7 +262,7 @@ GSTIN: ${s.gstin}
 ━━━━━━━━━━━━━━━━━━━━
 *BILL: HTB-${(o.billNo || '').split('-').pop()}*
 Table: ${o.tableNo}
-${new Date(o.date).toLocaleString("en-IN")}
+${new Date(o.createdAt || o.date).toLocaleString("en-IN")}
 ━━━━━━━━━━━━━━━━━━━━
 
 ${itemsText}
