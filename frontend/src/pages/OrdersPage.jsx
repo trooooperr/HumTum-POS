@@ -204,6 +204,7 @@ export default function OrdersPage() {
 
   const filtered = useMemo(() => {
     const list = (Array.isArray(orderHistory) ? orderHistory : []).filter(o => {
+      if (!o.billNo || o.billNo.trim() === '') return false;
       const d = new Date(o.date);
       const matchDate = (!startDate || d >= new Date(startDate)) && (!endDate || d <= new Date(endDate + 'T23:59:59'));
       const matchSearch = !search ||

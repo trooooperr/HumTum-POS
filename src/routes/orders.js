@@ -53,7 +53,8 @@ router.get('/', async (req, res) => {
     if (cached) return res.json(cached);
 
     const orders = await Order.find({
-      grandTotal: { $gt: 0 }
+      grandTotal: { $gt: 0 },
+      billNo: { $ne: '' }
     }).sort({ createdAt: -1, billNo: -1 });
     await setCache(ORDERS_CACHE_KEY, orders, 180);
     res.json(orders);
@@ -389,7 +390,7 @@ router.patch('/:id/finalize-bill', async (req, res) => {
 // ── GET FULL ORDER HISTORY (including completed) ────────────────────
 router.get('/history/all', async (req, res) => {
   try {
-    const orders = await Order.find({ isActive: false, grandTotal: { $gt: 0 } }).sort({ createdAt: -1, billNo: -1 }).populate('kotIds');
+    const orders = await Order.find({ isActive: false, grandTotal: { $gt: 0 }, billNo: { $ne: '' } }).sort({ createdAt: -1, billNo: -1 }).populate('kotIds');
     res.json(orders);
   } catch (err) {
     res.status(500).json({ message: err.message });
