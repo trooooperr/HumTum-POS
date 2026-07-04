@@ -398,26 +398,6 @@ function setupDbChangeStreams(io) {
       }
     });
 
-    // Watch orders collection to extract and save customer information
-    const orderStream = db.collection('orders').watch([], { fullDocument: 'updateLookup' });
-    orderStream.on('change', async (change) => {
-      try {
-        if (change.operationType === 'insert' || change.operationType === 'update' || change.operationType === 'replace') {
-          const doc = change.fullDocument;
-          if (doc && doc.customerPhone && doc.customerPhone.trim() !== '') {
-            const Customer = require('./src/models/Customer');
-            await Customer.findOneAndUpdate(
-              { phone: doc.customerPhone.trim() },
-              { $set: { name: doc.customerName || '' } },
-              { upsert: true, new: true }
-            );
-          }
-        }
-      } catch (err) {
-        console.error('❌ Error saving customer from order stream:', err.message);
-      }
-    });
-
     // Watch kots collection
     const kotStream = db.collection('kots').watch([], { fullDocument: 'updateLookup' });
     kotStream.on('change', async (change) => {

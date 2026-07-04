@@ -30,12 +30,10 @@ function getBusinessDate(originalDate = new Date()) {
 // Generate new Bill No based on boundary (only includes orders that have a valid bill number suffix)
 async function generateNextBillNo() {
   const boundary = getBusinessDayBoundary();
-  // Fetch all orders from today that have a valid billNo format, are completed, and have a grandTotal > 0
+  // Fetch all orders from today that have a valid billNo format
   const todayOrders = await Order.find({
     createdAt: { $gte: boundary },
-    billNo: { $regex: /^HTB-\d+$/ },
-    isActive: false,
-    grandTotal: { $gt: 0 }
+    billNo: { $regex: /^HTB-\d+$/ }
   }).select('billNo');
 
   let nextNumber = 1;
@@ -188,7 +186,7 @@ router.get('/table/:tableNo/session', async (req, res) => {
 router.put('/table/:tableNo/session', async (req, res) => {
   try {
     const { tableNo } = req.params;
-    const { pendingItems, totalAmount, waiterName, orderType, customerName, customerPhone } = req.body;
+    const { pendingItems, totalAmount, waiterName, orderType } = req.body;
     
     const sessions = await TableSession.find({ tableNo: parseInt(tableNo), status: { $ne: 'COMPLETED' } });
     let activeSession = null;
@@ -207,15 +205,6 @@ router.put('/table/:tableNo/session', async (req, res) => {
     if (!activeSession) {
       // Return 200 instead of 404 to prevent harmless frontend network errors during checkout race conditions
       return res.status(200).json({ message: 'No active session found (likely completed)' });
-    }
-
-    if (activeSession.activeOrderId) {
-      await Order.findByIdAndUpdate(activeSession.activeOrderId, {
-        $set: {
-          customerName: customerName || '',
-          customerPhone: customerPhone || ''
-        }
-      });
     }
 
     const session = await TableSession.findByIdAndUpdate(
