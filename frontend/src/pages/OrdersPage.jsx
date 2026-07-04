@@ -213,13 +213,17 @@ export default function OrdersPage() {
       return matchDate && matchSearch;
     });
 
-    // Sort by date descending (latest first) as priority, then by billNo descending
+    // Sort by date (calendar day only) descending, then by billNo descending
     return list.sort((a, b) => {
-      const aTime = new Date(a.createdAt || a.date || 0).getTime();
-      const bTime = new Date(b.createdAt || b.date || 0).getTime();
+      const aDate = new Date(a.date || a.createdAt);
+      const bDate = new Date(b.date || b.createdAt);
       
-      if (aTime !== bTime) {
-        return bTime - aTime; // Descending: latest date first
+      // Reset hours, minutes, seconds, milliseconds to compare only the calendar date
+      const aDay = new Date(aDate.getFullYear(), aDate.getMonth(), aDate.getDate()).getTime();
+      const bDay = new Date(bDate.getFullYear(), bDate.getMonth(), bDate.getDate()).getTime();
+      
+      if (aDay !== bDay) {
+        return bDay - aDay; // Descending: latest date first
       }
 
       const aNo = a.billNo || '';

@@ -169,4 +169,77 @@ describe('Orders API', () => {
     item = await Inventory.findOne({ name: 'Test Soda' });
     expect(item.stock).toBe(7);
   });
+
+  it('should generate sequential bill numbers correctly, handle manual updates and reset on a new business day', async () => {
+    // 1. Create a finalized order on July 4th
+    const orderData1 = {
+      tableNo: 5,
+      items: [{ name: 'Test Soda', quantity: 1, price: 50 }],
+      subtotal: 50,
+      sgst: 1.25,
+      cgst: 1.25,
+      discount: 0,
+      grandTotal: 52.5,
+      paidAmount: 52.5,
+      dueAmount: 0,
+      paymentMode: 'cash',
+      date: new Date('2026-07-04T12:00:00Z').toISOString()
+    };
+
+    const res1 = await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${token}`)
+      .send(orderData1);
+    
+    expect(res1.statusCode).toBe(201);
+    expect(res1.body.billNo).toMatch(/^HTB-\d+$/);
+    const billNum1 = parseInt(res1.body.billNo.match(/HTB-(\d+)/)[1], 10);
+
+    // 2. Create another finalized order on the same day (July 4th) and verify sequential increment
+    const orderData2 = {
+      tableNo: 6,
+      items: [{ name: 'Test Soda', quantity: 1, price: 50 }],
+      subtotal: 50,
+      sgst: 1.25,
+      cgst: 1.25,
+      discount: 0,
+      grandTotal: 52.5,
+      paidAmount: 52.5,
+      dueAmount: 0,
+      paymentMode: 'cash',
+      date: new Date('2026-07-04T13:00:00Z').toISOString()
+    };
+
+    const res2 = await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${token}`)
+      .send(orderData2);
+    
+    expect(res2.statusCode).toBe(201);
+    const billNum2 = parseInt(res2.body.billNo.match(/HTB-(\d+)/)[1], 10);
+    expect(billNum2).toBe(billNum1 + 1);
+
+    // 3. Create an order on a different business day (July 5th) and verify it resets to HTB-001
+    const orderData3 = {
+      tableNo: 7,
+      items: [{ name: 'Test Soda', quantity: 1, price: 50 }],
+      subtotal: 50,
+      sgst: 1.25,
+      cgst: 1.25,
+      discount: 0,
+      grandTotal: 52.5,
+      paidAmount: 52.5,
+      dueAmount: 0,
+      paymentMode: 'cash',
+      date: new Date('2026-07-05T12:00:00Z').toISOString()
+    };
+
+    const res3 = await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${token}`)
+      .send(orderData3);
+
+    expect(res3.statusCode).toBe(201);
+    expect(res3.body.billNo).toBe('HTB-001');
+  });
 });

@@ -26,13 +26,25 @@ function getBusinessDate(originalDate = new Date()) {
   return d;
 }
 
-// Generate new Bill No based on boundary
 // Generate new Bill No based on boundary (only includes orders that have a valid bill number suffix)
-async function generateNextBillNo() {
-  const boundary = getBusinessDayBoundary();
+async function generateNextBillNo(targetDate = new Date()) {
+  const businessDate = getBusinessDate(targetDate);
+  
+  // Calculate IST calendar day bounds for this businessDate
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // +5:30
+  const istTime = new Date(businessDate.getTime() + IST_OFFSET_MS);
+  const startIST = new Date(Date.UTC(
+    istTime.getUTCFullYear(),
+    istTime.getUTCMonth(),
+    istTime.getUTCDate(),
+    0, 0, 0, 0
+  ));
+  const start = new Date(startIST.getTime() - IST_OFFSET_MS);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+
   // Fetch all orders from today that have a valid billNo format
   const todayOrders = await Order.find({
-    createdAt: { $gte: boundary },
+    date: { $gte: start, $lt: end },
     billNo: { $regex: /^HTB-\d+$/ }
   }).select('billNo');
 
@@ -236,7 +248,8 @@ router.post('/', async (req, res) => {
     // Assign sequential bill number only if the order is already marked as finalized/inactive or completed
     const isCompleted = orderData.isActive === false || orderData.orderStatus === 'COMPLETED' || (orderData.dueAmount === 0 && Array.isArray(orderData.items) && orderData.items.length > 0);
     if (isCompleted) {
-      orderData.billNo = await generateNextBillNo();
+      const targetDate = orderData.date ? new Date(orderData.date) : new Date();
+      orderData.billNo = await generateNextBillNo(targetDate);
     } else {
       orderData.billNo = '';
     }
@@ -342,7 +355,7 @@ router.patch('/:id/finalize-bill', async (req, res) => {
 
     // Generate and assign sequential bill number at checkout
     if (!order.billNo || order.billNo === 'PENDING') {
-      order.billNo = await generateNextBillNo();
+      order.billNo = await generateNextBillNo(order.date);
     }
 
     const saved = await order.save();
@@ -421,7 +434,7 @@ router.patch('/:id/settle', async (req, res) => {
       order.isActive = false;
       order.date = getBusinessDate(new Date());
       if (!order.billNo || order.billNo === 'PENDING') {
-        order.billNo = await generateNextBillNo();
+        order.billNo = await generateNextBillNo(order.date);
       }
     }
     
@@ -465,7 +478,7 @@ router.patch('/:id/complete', async (req, res) => {
     order.isActive = false;
     order.date = getBusinessDate(new Date());
     if (!order.billNo || order.billNo === 'PENDING') {
-      order.billNo = await generateNextBillNo();
+      order.billNo = await generateNextBillNo(order.date);
     }
     const saved = await order.save();
 
