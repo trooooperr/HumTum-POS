@@ -303,10 +303,19 @@ export default function OrdersPage() {
   };
 
   const filtered = useMemo(() => {
+    const getLocalDateString = (dateObj) => {
+      if (!dateObj) return '';
+      const d = new Date(dateObj);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
     const list = (Array.isArray(orderHistory) ? orderHistory : []).filter(o => {
       if (!o.billNo || o.billNo.trim() === '') return false;
-      const d = new Date(o.date);
-      const matchDate = (!startDate || d >= new Date(startDate)) && (!endDate || d <= new Date(endDate + 'T23:59:59'));
+      const localDateStr = getLocalDateString(o.date);
+      const matchDate = (!startDate || localDateStr >= startDate) && (!endDate || localDateStr <= endDate);
       const matchSearch = !search ||
         (o.billNo && o.billNo.toLowerCase().includes(search.toLowerCase())) ||
         (o.customerName || 'Walk-in Customer').toLowerCase().includes(search.toLowerCase());
