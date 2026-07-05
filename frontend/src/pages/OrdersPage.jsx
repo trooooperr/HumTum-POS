@@ -303,7 +303,7 @@ export default function OrdersPage() {
   };
 
   const filtered = useMemo(() => {
-    return (Array.isArray(orderHistory) ? orderHistory : []).filter(o => {
+    const list = (Array.isArray(orderHistory) ? orderHistory : []).filter(o => {
       if (!o.billNo || o.billNo.trim() === '') return false;
       const d = new Date(o.date);
       const matchDate = (!startDate || d >= new Date(startDate)) && (!endDate || d <= new Date(endDate + 'T23:59:59'));
@@ -311,6 +311,31 @@ export default function OrdersPage() {
         (o.billNo && o.billNo.toLowerCase().includes(search.toLowerCase())) ||
         (o.customerName || 'Walk-in Customer').toLowerCase().includes(search.toLowerCase());
       return matchDate && matchSearch;
+    });
+
+    // Group by business calendar day descending, then sort by billNo numeric value descending (newest prints on top)
+    // This ensures sorting order is stable and does not shift when updating payment mode or discounts.
+    return list.sort((a, b) => {
+      const aDate = new Date(a.date || a.createdAt);
+      const bDate = new Date(b.date || b.createdAt);
+      
+      const aDay = new Date(aDate.getFullYear(), aDate.getMonth(), aDate.getDate()).getTime();
+      const bDay = new Date(bDate.getFullYear(), bDate.getMonth(), bDate.getDate()).getTime();
+      
+      if (aDay !== bDay) {
+        return bDay - aDay; // Descending: latest date first
+      }
+
+      const aNo = a.billNo || '';
+      const bNo = b.billNo || '';
+      
+      const aMatch = aNo.match(/HTB-(\d+)/);
+      const bMatch = bNo.match(/HTB-(\d+)/);
+      
+      const aNum = aMatch ? parseInt(aMatch[1], 10) : 0;
+      const bNum = bMatch ? parseInt(bMatch[1], 10) : 0;
+      
+      return bNum - aNum; // Descending: higher bill numbers first
     });
   }, [orderHistory, search, startDate, endDate]);
 
