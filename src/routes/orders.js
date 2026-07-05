@@ -248,6 +248,9 @@ router.post('/', async (req, res) => {
     // Assign sequential bill number only if the order is already marked as finalized/inactive or completed
     const isCompleted = orderData.isActive === false || orderData.orderStatus === 'COMPLETED' || (orderData.dueAmount === 0 && Array.isArray(orderData.items) && orderData.items.length > 0);
     if (isCompleted) {
+      if (orderData.grandTotal <= 0) {
+        return res.status(400).json({ message: 'Cannot save completed order with grand total 0' });
+      }
       const targetDate = orderData.date ? new Date(orderData.date) : new Date();
       orderData.billNo = await generateNextBillNo(getBusinessDate(targetDate));
     } else {
@@ -334,6 +337,10 @@ router.patch('/:id/finalize-bill', async (req, res) => {
       });
     }
 
+    if (grandTotal <= 0) {
+      return res.status(400).json({ message: 'Cannot finalize bill with grand total 0' });
+    }
+
     // Update order with final calculations (combine all KOT items)
     order.items = items;
     order.subtotal = subtotal;
@@ -416,6 +423,10 @@ router.patch('/:id/settle', async (req, res) => {
     const { paidAmount, paymentMode, cashAmount, upiAmount } = req.body;
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    if (order.grandTotal <= 0) {
+      return res.status(400).json({ message: 'Cannot settle payment for order with grand total 0' });
+    }
 
     if (paidAmount !== undefined) {
       order.paidAmount = (order.paidAmount || 0) + parseFloat(paidAmount || 0);
@@ -524,6 +535,10 @@ router.patch('/:id/complete', async (req, res) => {
       await Order.findByIdAndDelete(order._id);
       await deleteCache([ORDERS_CACHE_KEY, REPORT_SUMMARY_CACHE_KEY]);
       return res.json({ success: true, cleared: true, _id: order._id, tableNo: order.tableNo });
+    }
+
+    if (order.grandTotal <= 0) {
+      return res.status(400).json({ message: 'Cannot complete order with grand total 0' });
     }
 
     // Mark order as completed
