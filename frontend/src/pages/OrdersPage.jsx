@@ -320,6 +320,7 @@ export default function OrdersPage() {
 
   const filtered = useMemo(() => {
     const list = (Array.isArray(orderHistory) ? orderHistory : []).filter(o => {
+      if (o.isActive) return false;
       if (!o.billNo || o.billNo.trim() === '') return false;
       const localDateStr = o.businessDate || getLocalDateString(o.date);
       const matchDate = (!startDate || localDateStr >= startDate) && (!endDate || localDateStr <= endDate);
@@ -332,22 +333,25 @@ export default function OrdersPage() {
     // Group by business calendar day descending, then sort by billNo numeric value descending (newest prints on top)
     // This ensures sorting order is stable and does not shift when updating payment mode or discounts.
     return list.sort((a, b) => {
-      const aBizDate = a.businessDate || getLocalDateString(a.date);
-      const bBizDate = b.businessDate || getLocalDateString(b.date);
-      
-      if (aBizDate !== bBizDate) {
-        return bBizDate.localeCompare(aBizDate); // Descending: latest business date first
+      const aDate = new Date(a.date || a.createdAt);
+      const bDate = new Date(b.date || b.createdAt);
+
+      const aDay = new Date(aDate.getFullYear(), aDate.getMonth(), aDate.getDate()).getTime();
+      const bDay = new Date(bDate.getFullYear(), bDate.getMonth(), bDate.getDate()).getTime();
+
+      if (aDay !== bDay) {
+        return bDay - aDay; // Descending: latest date first
       }
 
       const aNo = a.billNo || '';
       const bNo = b.billNo || '';
-      
+
       const aMatch = aNo.match(/HTB-(\d+)/);
       const bMatch = bNo.match(/HTB-(\d+)/);
-      
+
       const aNum = aMatch ? parseInt(aMatch[1], 10) : 0;
       const bNum = bMatch ? parseInt(bMatch[1], 10) : 0;
-      
+
       return bNum - aNum; // Descending: higher bill numbers first
     });
   }, [orderHistory, search, startDate, endDate]);
@@ -366,9 +370,9 @@ export default function OrdersPage() {
           className="badge badge-split"
           style={{ cursor: 'pointer' }}
           onClick={handleBadgeClick}
-          title={`Cash: ${c}${(order.cashAmount||0).toFixed(0)}, UPI: ${c}${(order.upiAmount||0).toFixed(0)}`}
+          title={`Cash: ${c}${(order.cashAmount || 0).toFixed(0)}, UPI: ${c}${(order.upiAmount || 0).toFixed(0)}`}
         >
-          SPLIT (C:{(order.cashAmount||0).toFixed(0)} U:{(order.upiAmount||0).toFixed(0)})
+          SPLIT (C:{(order.cashAmount || 0).toFixed(0)} U:{(order.upiAmount || 0).toFixed(0)})
         </span>
       );
     }

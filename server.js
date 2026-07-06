@@ -20,24 +20,24 @@ if (!JWT_SECRET || JWT_SECRET.length < 32 || INSECURE_DEFAULTS.includes(JWT_SECR
 }
 
 const mongoose = require('mongoose');
-const cron     = require('node-cron');
-const http     = require('http');
+const cron = require('node-cron');
+const http = require('http');
 const socketIO = require('socket.io');
 
-const app    = require('./app');
+const app = require('./app');
 const { connectRedis, setCache } = require('./src/lib/redis');
 const Settings = require('./src/models/Settings');
-const { seedDefaultUsers }       = require('./src/routes/auth');
+const { seedDefaultUsers } = require('./src/routes/auth');
 const { sendDailyReportInternal } = require('./src/routes/reports');
 
-const PORT        = Number(process.env.PORT || 3000);
+const PORT = Number(process.env.PORT || 3000);
 const REPORT_TIME = process.env.REPORT_CRON || '0 5 * * *';
 
 // ── HTTP Server + Socket.IO ──────────────────────────────────────
 const server = http.createServer(app);
 const io = socketIO(server, {
   cors: { origin: true, credentials: true },
-  pingTimeout:  60000,
+  pingTimeout: 60000,
   pingInterval: 25000,
 });
 
@@ -59,69 +59,12 @@ function scheduleDailyReport() {
   console.log(`📅 Daily report cron scheduled: ${REPORT_TIME} IST`);
 }
 
-// ── Cron: Clean up empty inactive sessions ───────────────────────
-function scheduleCleanupCron() {
-  // Runs every hour
-  cron.schedule('0 * * * *', async () => {
-    console.log('🧹 Running empty inactive session cleanup...');
-    try {
-      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
-      const TableSession = require('./src/models/TableSession');
-      const Order = require('./src/models/Order');
-      const KOT = require('./src/models/KOT');
-
-      // 1. Clean up inactive TableSessions and their linked orders if empty
-      const inactiveSessions = await TableSession.find({
-        pendingItems: { $size: 0 },
-        kotIds: { $size: 0 },
-        lastActivityAt: { $lt: twoHoursAgo }
-      });
-
-      let cleanedSessionsCount = 0;
-      for (const session of inactiveSessions) {
-        if (session.activeOrderId) {
-          const order = await Order.findById(session.activeOrderId);
-          if (order && (!order.items || order.items.length === 0)) {
-            await Order.findByIdAndDelete(order._id);
-            await KOT.deleteMany({ orderId: order._id });
-          }
-        }
-        await TableSession.findByIdAndDelete(session._id);
-        cleanedSessionsCount++;
-      }
-
-      // 2. Clean up orphaned active Orders with no items older than 2 hours
-      const activeOrders = await Order.find({
-        isActive: true,
-        items: { $size: 0 },
-        createdAt: { $lt: twoHoursAgo }
-      });
-
-      let cleanedOrdersCount = 0;
-      for (const order of activeOrders) {
-        const session = await TableSession.findOne({ activeOrderId: order._id });
-        if (!session) {
-          await Order.findByIdAndDelete(order._id);
-          cleanedOrdersCount++;
-        }
-      }
-
-      if (cleanedSessionsCount > 0 || cleanedOrdersCount > 0) {
-        console.log(`✅ Cleanup completed. Removed ${cleanedSessionsCount} empty sessions and ${cleanedOrdersCount} orphaned active orders.`);
-      }
-    } catch (err) {
-      console.error('❌ Failed to clean up empty inactive sessions:', err.message);
-    }
-  });
-  console.log('📅 Empty inactive session cleanup cron scheduled (hourly)');
-}
-
 // ── Cache warmup ─────────────────────────────────────────────────
 async function warmupCache() {
   try {
     const MenuItem = require('./src/models/MenuItem');
     const Inventory = require('./src/models/Inventory');
-    const Worker    = require('./src/models/Worker');
+    const Worker = require('./src/models/Worker');
 
     const [rawMenuItems, settings, rawInventory, workers] = await Promise.all([
       MenuItem.find(),
@@ -161,10 +104,10 @@ async function warmupCache() {
     });
 
     await Promise.all([
-      setCache('menu:all',          rawMenuItems, 300),
-      setCache('settings:current',  settings,  300),
-      setCache('inventory:all',     rawInventory, 300),
-      setCache('workers:all',       workers,   300),
+      setCache('menu:all', rawMenuItems, 300),
+      setCache('settings:current', settings, 300),
+      setCache('inventory:all', rawInventory, 300),
+      setCache('workers:all', workers, 300),
     ]);
     console.log('🔥 Cache warmed up');
   } catch (err) {
@@ -175,7 +118,7 @@ async function warmupCache() {
 // ── Startup migration: fix inventory-backed MenuItems department ──
 async function migrateInventoryMenuItems() {
   try {
-    const MenuItem  = require('./src/models/MenuItem');
+    const MenuItem = require('./src/models/MenuItem');
     const Inventory = require('./src/models/Inventory');
     const inventoryItems = await Inventory.find().select('name');
     const inventoryNames = inventoryItems.map(i => i.name);
@@ -210,7 +153,7 @@ async function seedCLRMenuItem() {
       });
       console.log('✅ Seeded CLR menu item');
       const { deleteCache } = require('./src/lib/redis');
-      await deleteCache('menu:all').catch(() => {});
+      await deleteCache('menu:all').catch(() => { });
     }
   } catch (err) {
     console.warn('⚠️ Seeding CLR menu item failed:', err.message);
@@ -251,7 +194,7 @@ async function gracefulShutdown(signal) {
 }
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT',  () => gracefulShutdown('SIGINT'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // ── Unhandled errors ─────────────────────────────────────────────
 process.on('uncaughtException', (err) => {
@@ -376,12 +319,12 @@ async function startServer() {
     try {
       await mongoose.connect(mongoUri, {
         serverSelectionTimeoutMS: 30_000,
-        socketTimeoutMS:          45_000,
-        maxPoolSize:              10,
-        minPoolSize:              2,
-        family:                   4,    // Force IPv4
-        retryWrites:              true,
-        w:                        'majority',
+        socketTimeoutMS: 45_000,
+        maxPoolSize: 10,
+        minPoolSize: 2,
+        family: 4,    // Force IPv4
+        retryWrites: true,
+        w: 'majority',
       });
     } catch (connErr) {
       console.error('❌ MongoDB connection failed:', connErr.message);
@@ -398,7 +341,7 @@ async function startServer() {
     (async () => {
       try {
         const coll = mongoose.connection.db.collection('tablesessions');
-        await coll.dropIndex('tableId_1').catch(() => {});
+        await coll.dropIndex('tableId_1').catch(() => { });
         await coll.createIndex({ tableNo: 1, status: 1 });
         console.log('✅ TableSession indexes verified');
       } catch (idxErr) {
@@ -431,7 +374,6 @@ async function startServer() {
       console.log(`📡 Server running on port ${PORT}`);
       console.log(`🔗 Socket.IO ready`);
       scheduleDailyReport();
-      scheduleCleanupCron();
     });
 
   } catch (err) {
@@ -473,8 +415,8 @@ function setupDbChangeStreams(io) {
               const KOT = require('./src/models/KOT');
               const Order = require('./src/models/Order');
               const { deductInventoryForItems, broadcastInventoryUpdate } = require('./src/lib/inventoryStock');
-              
-               // Atomically claim the deduction task to prevent other server processes from double-deducting in parallel
+
+              // Atomically claim the deduction task to prevent other server processes from double-deducting in parallel
               const kotDoc = await KOT.findOneAndUpdate(
                 { _id: doc._id, inventoryDeducted: { $ne: true } },
                 { $set: { inventoryDeducted: true, inventoryDeductedAt: new Date() } },
@@ -488,7 +430,7 @@ function setupDbChangeStreams(io) {
                 } else {
                   console.log(`📡 Change Stream: Deducting inventory for table KOT ${kotDoc.kotNo}...`);
                   const updatedInventory = await deductInventoryForItems(kotDoc.items);
-                  
+
                   broadcastInventoryUpdate({ app: { locals: { io } } }, updatedInventory, {
                     orderId: kotDoc.orderId,
                     kotId: kotDoc._id,

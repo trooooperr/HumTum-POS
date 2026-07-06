@@ -15,11 +15,11 @@ const {
   deductInventoryForItems,
 } = require('../lib/inventoryStock');
 
+// Generate new Bill No based on businessDateStr (e.g. "2026-07-04")
 async function generateNextBillNo(businessDateStr) {
-  // Fetch all finalized orders from this business day that have a valid billNo format
+  // Fetch all orders from this business day that have a valid billNo format
   const todayOrders = await Order.find({
     businessDate: businessDateStr,
-    isActive: false, // Ensure we ignore any active/open table sessions
     billNo: { $regex: /^HTB-\d+$/ }
   }).select('billNo');
 
@@ -40,6 +40,7 @@ router.get('/', async (req, res) => {
     if (cached) return res.json(cached);
 
     const orders = await Order.find({
+      isActive: { $ne: true },
       grandTotal: { $gt: 0 },
       billNo: { $ne: '' }
     }).sort({ date: -1, billNo: -1 });
@@ -61,7 +62,7 @@ router.post('/table/:tableNo/open', async (req, res) => {
   try {
     const { tableNo } = req.params;
     const { waiterName, orderType } = req.body;
-    
+
     // Check if table is already open, heal duplicate/orphaned sessions
     const activeSessions = await TableSession.find({ tableNo: parseInt(tableNo), status: { $ne: 'COMPLETED' } }).populate('activeOrderId');
     let existingSession = null;
@@ -123,7 +124,7 @@ router.post('/table/:tableNo/open', async (req, res) => {
     const savedSession = await session.save();
     const sessionObj = savedSession.toObject();
     sessionObj.activeOrderId = savedOrder.toObject();
-    
+
     res.status(201).json(sessionObj);
   } catch (err) { res.status(400).json({ message: err.message }); }
 });
@@ -147,7 +148,7 @@ router.get('/table/:tableNo/session', async (req, res) => {
     const sessions = await TableSession.find({ tableNo: parseInt(tableNo), status: { $ne: 'COMPLETED' } })
       .populate('kotIds')
       .populate('activeOrderId');
-    
+
     let activeSession = null;
     for (const session of sessions) {
       if (!session.activeOrderId || !session.activeOrderId.isActive) {
@@ -160,12 +161,12 @@ router.get('/table/:tableNo/session', async (req, res) => {
         }
       }
     }
-    
+
     if (!activeSession) {
       // Return 200 instead of 404 to prevent harmless frontend network errors
       return res.status(200).json({ message: 'No active session' });
     }
-    
+
     res.json(activeSession);
   } catch (err) { res.status(500).json({ message: err.message }); }
 });
@@ -175,7 +176,7 @@ router.put('/table/:tableNo/session', async (req, res) => {
   try {
     const { tableNo } = req.params;
     const { pendingItems, totalAmount, waiterName, orderType } = req.body;
-    
+
     const sessions = await TableSession.find({ tableNo: parseInt(tableNo), status: { $ne: 'COMPLETED' } });
     let activeSession = null;
     for (const session of sessions) {
@@ -189,7 +190,7 @@ router.put('/table/:tableNo/session', async (req, res) => {
         }
       }
     }
-    
+
     if (!activeSession) {
       // Return 200 instead of 404 to prevent harmless frontend network errors during checkout race conditions
       return res.status(200).json({ message: 'No active session found (likely completed)' });
@@ -197,22 +198,22 @@ router.put('/table/:tableNo/session', async (req, res) => {
 
     const session = await TableSession.findByIdAndUpdate(
       activeSession._id,
-      { 
-        $set: { 
+      {
+        $set: {
           pendingItems: pendingItems || [],
           totalAmount: totalAmount || 0,
           waiterName: waiterName || '',
           orderType: orderType || 'dine-in',
           lastActivityAt: new Date()
-        } 
+        }
       },
       { new: true }
     ).populate('activeOrderId').populate('kotIds');
-    
+
     res.json(session);
-  } catch (err) { 
+  } catch (err) {
     console.error('Update Table Session Error:', err);
-    res.status(400).json({ message: err.message }); 
+    res.status(400).json({ message: err.message });
   }
 });
 
@@ -223,9 +224,9 @@ router.post('/', async (req, res) => {
 
     const targetDate = orderData.date ? new Date(orderData.date) : new Date();
     orderData.businessDate = getBusinessDateString(targetDate);
-    
+
     // Assign sequential bill number only if the order is already marked as finalized/inactive or completed
-    const isCompleted = orderData.isActive !== true && (orderData.isActive === false || orderData.orderStatus === 'COMPLETED' || (orderData.dueAmount === 0 && Array.isArray(orderData.items) && orderData.items.length > 0));
+    const isCompleted = orderData.isActive === false || orderData.orderStatus === 'COMPLETED' || (orderData.dueAmount === 0 && Array.isArray(orderData.items) && orderData.items.length > 0 && orderData.isActive !== true);
     if (isCompleted) {
       if (orderData.grandTotal <= 0) {
         return res.status(400).json({ message: 'Cannot save completed order with grand total 0' });
@@ -234,7 +235,7 @@ router.post('/', async (req, res) => {
     } else {
       orderData.billNo = '';
     }
-    
+
     const isDirectOrder = Array.isArray(orderData.items) && orderData.items.length > 0;
 
     // New KOT workflow: don't deduct inventory yet, only create order if items empty
@@ -268,8 +269,8 @@ router.post('/', async (req, res) => {
       await TableSession.findOneAndUpdate(
         { tableNo: orderData.tableNo, status: { $ne: 'COMPLETED' } },
         {
-          $set: { 
-            status: isDirectOrder && orderData.dueAmount === 0 ? 'COMPLETED' : 'OPEN', 
+          $set: {
+            status: isDirectOrder && orderData.dueAmount === 0 ? 'COMPLETED' : 'OPEN',
             activeOrderId: saved._id,
             lastActivityAt: new Date(),
             totalAmount: orderData.grandTotal || 0
@@ -410,15 +411,15 @@ router.patch('/:id/settle', async (req, res) => {
 
     if (paidAmount !== undefined) {
       order.paidAmount = (order.paidAmount || 0) + parseFloat(paidAmount || 0);
-      order.dueAmount  = Math.max(0, order.grandTotal - order.paidAmount);
+      order.dueAmount = Math.max(0, order.grandTotal - order.paidAmount);
     }
-    
+
     if (paymentMode) {
       order.paymentMode = paymentMode;
     }
     if (cashAmount !== undefined) order.cashAmount = parseFloat(cashAmount) || 0;
     if (upiAmount !== undefined) order.upiAmount = parseFloat(upiAmount) || 0;
-    
+
     // Mark order as paid when full payment received
     if (order.dueAmount <= 0) {
       order.orderStatus = 'PAID';
@@ -429,15 +430,15 @@ router.patch('/:id/settle', async (req, res) => {
         order.billNo = await generateNextBillNo(order.businessDate);
       }
     }
-    
+
     const saved = await order.save();
 
     // Update table session
     await TableSession.findOneAndUpdate(
       { activeOrderId: order._id },
-      { 
-        $set: { 
-          paymentReceived: true, 
+      {
+        $set: {
+          paymentReceived: true,
           status: 'PAID',
           lastActivityAt: new Date()
         }
@@ -462,7 +463,7 @@ router.patch('/:id/discount', async (req, res) => {
     }
 
     order.discount = discountVal;
-    
+
     // Recalculate grandTotal and roundOff
     const rawTotal = order.subtotal + order.sgst + order.cgst - discountVal;
     const rounded = Math.round(rawTotal);
