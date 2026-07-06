@@ -89,7 +89,7 @@ export default function SalesPage() {
   const { settings } = useApp();
   const todayStr = new Date().toISOString().slice(0, 10);
 
-  const [range, setRange] = useState('month');
+  const [range, setRange] = useState('today');
   const [startDate, setStartDate] = useState(todayStr);
   const [endDate, setEndDate] = useState(todayStr);
   const startInputRef = React.useRef(null);

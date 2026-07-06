@@ -46,7 +46,7 @@ export default function Sidebar() {
               The BAR & Restaurant
             </div>
           </div>
-          <button className="iBtn" style={{ padding:4 }} onClick={()=>setSidebarOpen(false)}><X size={12}/></button>
+          <button className="iBtn sbar-close" style={{ padding:4 }} onClick={()=>setSidebarOpen(false)}><X size={12}/></button>
         </div>
 
         {/* User */}
