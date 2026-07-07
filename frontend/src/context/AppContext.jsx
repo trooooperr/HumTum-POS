@@ -347,24 +347,24 @@ export function AppProvider({ children }) {
 
   const buildKOTHtml = useCallback((kot, tableNo, items, printerLabel) => {
     const itemCount = items.length;
-    const pageHeight = Math.max(105, 70 + (itemCount * 9));
+    const pageHeight = Math.max(110, 75 + (itemCount * 12));
     return `
     <html>
       <head>
         <title>${printerLabel}</title>
         <style>
-          @page { size: 80mm ${pageHeight}mm; margin: 0; }
-          body { font-family: monospace; width: 70mm; margin: 0; padding: 0; font-size: 12px; font-weight: bold; }
+          @page { size: 58mm ${pageHeight}mm; margin: 0; }
+          body { font-family: monospace; width: 48mm; margin: 0; padding: 0; font-size: 11px; font-weight: bold; }
           .header { text-align: center; font-weight: bold; margin-bottom: 6px; font-size: 11px; }
-          .sub { text-align: center; font-size: 11px; margin-bottom: 4px; }
+          .sub { text-align: center; font-size: 10px; margin-bottom: 4px; }
           .divider { border-top: 1px dashed #000; margin: 5px 0; }
           .item { display: flex; justify-content: space-between; margin: 3px 0; }
-          .qty { font-weight: bold; min-width: 24px; }
-          .note { font-size: 10px; margin: 0 0 4px 8px; border-left: 2px solid #000; padding-left: 4px; }
+          .qty { font-weight: bold; min-width: 20px; text-align: right; }
+          .note { font-size: 9px; margin: 0 0 4px 8px; border-left: 2px solid #000; padding-left: 4px; }
         </style>
       </head>
       <body>
-        <div class="header" style="font-size: 14px;">${printerLabel.toUpperCase()} KOT</div>
+        <div class="header" style="font-size: 13px;">${printerLabel.toUpperCase()} KOT</div>
         <div class="header">${kot.kotNo} &nbsp;&nbsp;|&nbsp;&nbsp; Table: ${tableNo}</div>
         <div class="sub">${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</div>
         <div class="divider"></div>
@@ -451,28 +451,28 @@ export function AppProvider({ children }) {
     const itemCount = table.items.length;
     const hasQr = grandTotal > 0 && settings.upiId;
     const hasTipQr = !!waiterTipQrUrl;
-    const pageHeight = 120 + (itemCount * 9) + (hasQr ? 55 : 0) + (hasTipQr ? 45 : 0);
+    const pageHeight = 135 + (itemCount * 12) + (hasQr ? 60 : 0) + (hasTipQr ? 50 : 0);
 
     const html = `
       <html>
         <head>
           <title>${settings.barPrinterName || 'BAR'} BILL</title>
           <style>
-            @page { size: 80mm ${pageHeight}mm; margin: 0; }
-            body { font-family: 'Courier New', Courier, monospace; width: 70mm; margin: 0; padding: 0; font-size: 13px; color: #000; line-height: 1.2; font-weight: bold; }
+            @page { size: 58mm ${pageHeight}mm; margin: 0; }
+            body { font-family: 'Courier New', Courier, monospace; width: 48mm; margin: 0; padding: 0; font-size: 11px; color: #000; line-height: 1.2; font-weight: bold; }
             .center { text-align: center; }
-            .brand { font-size: 18px; font-weight: 900; margin-bottom: 2px; text-transform: uppercase; }
-            .address { font-size: 12px; margin-bottom: 6px; line-height: 1.2; }
+            .brand { font-size: 15px; font-weight: 900; margin-bottom: 2px; text-transform: uppercase; }
+            .address { font-size: 10px; margin-bottom: 6px; line-height: 1.2; }
             .dash-line { border-top: 1px dashed #000; margin: 6px 0; }
             .thick-line { border-top: 2px solid #000; margin: 4px 0; }
-            .row { display: flex; justify-content: space-between; margin-bottom: 2px; font-size: 12px; }
-            .item-header { font-size: 12px; font-weight: 900; display: flex; margin-bottom: 4px; border-bottom: 1px solid #000; padding-bottom: 2px; }
-            .item-row { display: flex; margin-bottom: 3px; align-items: flex-start; font-size: 12px; }
+            .row { display: flex; justify-content: space-between; margin-bottom: 2px; font-size: 11px; }
+            .item-header { font-size: 11px; font-weight: 900; display: flex; margin-bottom: 4px; border-bottom: 1px solid #000; padding-bottom: 2px; }
+            .item-row { display: flex; margin-bottom: 3px; align-items: flex-start; font-size: 11px; }
             .col-name { flex: 1; padding-right: 4px; text-transform: uppercase; }
-            .col-qty { width: 35px; text-align: center; }
-            .col-amt { width: 65px; text-align: right; font-weight: bold; }
-            .footer-msg { font-size: 12px; margin-top: 10px; font-weight: bold; font-style: italic; }
-            .qr-code { width: 130px; height: 130px; margin: 8px auto 2px; display: block; }
+            .col-qty { width: 25px; text-align: center; }
+            .col-amt { width: 55px; text-align: right; font-weight: bold; }
+            .footer-msg { font-size: 11px; margin-top: 10px; font-weight: bold; font-style: italic; }
+            .qr-code { width: 100px; height: 100px; margin: 8px auto 2px; display: block; }
           </style>
         </head>
         <body>
@@ -513,21 +513,21 @@ export function AppProvider({ children }) {
 
           <div class="thick-line"></div>
           
-          <div class="row" style="font-size: 16px; font-weight: 900; margin: 4px 0;">
+          <div class="row" style="font-size: 13px; font-weight: 900; margin: 4px 0;">
             <span>TOTAL PAYABLE</span>
             <span>Rs. ${total.toFixed(0)}</span>
           </div>
 
-          <div class="row" style="font-size: 12px; margin: 2px 0;">
+          <div class="row" style="font-size: 11px; margin: 2px 0;">
             <span>PAID BY</span>
             <span>${paymentMode === 'split' ? 'SPLIT' : paymentMode.toUpperCase()}</span>
           </div>
           ${paymentMode === 'split' ? `
-          <div class="row" style="font-size: 11px;">
+          <div class="row" style="font-size: 10px;">
             <span>  Cash</span>
             <span>Rs. ${Number(cashAmount || 0).toFixed(0)}</span>
           </div>
-          <div class="row" style="font-size: 11px;">
+          <div class="row" style="font-size: 10px;">
             <span>  UPI</span>
             <span>Rs. ${Number(upiAmount || 0).toFixed(0)}</span>
           </div>
@@ -536,20 +536,20 @@ export function AppProvider({ children }) {
           <div class="thick-line"></div>
 
           <div class="center">
-            <div style="font-size: 13px; font-weight: bold; margin-bottom: 4px;">SCAN TO PAY BILL</div>
+            <div style="font-size: 12px; font-weight: bold; margin-bottom: 4px;">SCAN TO PAY BILL</div>
             <img class="qr-code" src="${qrCodeUrl}" alt="QR Code" />
             
             ${waiterTipQrUrl ? `
               <div class="dash-line" style="margin: 12px 0 8px 0;"></div>
-              <div style="font-size: 13px; font-weight: bold; margin-bottom: 2px;">TIP YOUR WAITER</div>
-              <div style="font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">Scan to Tip ${waiterObj.name.toUpperCase()} directly</div>
-              <img class="qr-code" style="width: 100px; height: 100px; margin: 4px auto 2px; display: block;" src="${waiterTipQrUrl}" alt="Tip QR Code" />
+              <div style="font-size: 12px; font-weight: bold; margin-bottom: 2px;">TIP YOUR WAITER</div>
+              <div style="font-size: 10px; font-weight: bold; color: #555; margin-bottom: 4px;">Scan to Tip ${waiterObj.name.toUpperCase()} directly</div>
+              <img class="qr-code" style="width: 80px; height: 80px; margin: 4px auto 2px; display: block;" src="${waiterTipQrUrl}" alt="Tip QR Code" />
             ` : ''}
 
             <div class="dash-line" style="margin-top: 10px;"></div>
             <div class="footer-msg">${settings.thankYouMsg || 'THANK YOU FOR VISITING!'}</div>
           </div>
-        </body>
+        </div>
       </html>
     `;
     firePrint(html, 'document', settings.billingPrinterName || settings.barPrinterName || '');
