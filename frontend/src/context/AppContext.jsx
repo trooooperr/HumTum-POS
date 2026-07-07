@@ -667,7 +667,7 @@ export function AppProvider({ children }) {
     const port = settings.printAgentPort || 5001;
     const token = settings.printAgentToken || '';
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 1000);
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // Increased from 1000ms to 10000ms to allow PowerShell command execution time
     try {
       const res = await fetch(`http://localhost:${port}/printers`, {
         headers: {
