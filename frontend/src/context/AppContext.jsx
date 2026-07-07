@@ -358,7 +358,7 @@ export function AppProvider({ children }) {
     
     const itemCount = items.length;
     const pageHeight = isKitchen
-      ? Math.max(140, 95 + (itemCount * 14))
+      ? Math.max(165, 120 + (itemCount * 14))
       : Math.max(105, 70 + (itemCount * 9));
 
     return `
@@ -386,7 +386,7 @@ export function AppProvider({ children }) {
           ${(i.notes || i.note) ? `<div class="note">${i.notes || i.note}</div>` : ''}
         `).join('')}
         <div class="divider"></div>
-        ${isKitchen ? '<div style="height: 25mm;"></div>' : ''}
+        ${isKitchen ? '<div style="height: 50mm;"></div>' : ''}
       </body>
     </html>
   `;
