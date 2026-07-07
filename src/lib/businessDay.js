@@ -43,7 +43,7 @@ function getBusinessDayBoundary() {
   boundary.setTime(boundary.getTime() - IST_OFFSET_MS);
 
   if (istHour < 5) {
-    boundary.setDate(boundary.getDate() - 1);
+    boundary.setUTCDate(boundary.getUTCDate() - 1);
   }
   return boundary;
 }
@@ -58,20 +58,31 @@ function getBusinessDayBoundary() {
 function getBusinessDayBounds() {
   const start = getBusinessDayBoundary();
   const end   = new Date(start);
-  end.setDate(end.getDate() + 1);
+  end.setUTCDate(end.getUTCDate() + 1);
   return { start, end };
 }
 
 function getBusinessDateString(date = new Date()) {
   const d = new Date(date);
-  const istHour = getISTHour(d);
-  if (istHour < 5) {
-    d.setDate(d.getDate() - 1);
+  const istTime = new Date(d.getTime() + IST_OFFSET_MS);
+
+  let year = istTime.getUTCFullYear();
+  let month = istTime.getUTCMonth();
+  let dateVal = istTime.getUTCDate();
+  let hour = istTime.getUTCHours();
+
+  if (hour < 5) {
+    const prevDay = new Date(Date.UTC(year, month, dateVal - 1));
+    year = prevDay.getUTCFullYear();
+    month = prevDay.getUTCMonth();
+    dateVal = prevDay.getUTCDate();
   }
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+
+  const yyyy = year;
+  const mm = String(month + 1).padStart(2, '0');
+  const dd = String(dateVal).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 module.exports = { getBusinessDayBoundary, getBusinessDayBounds, getISTHour, getBusinessDateString };
+

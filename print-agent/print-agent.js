@@ -74,9 +74,9 @@ function ensureSumatraPDF() {
       log(`SumatraPDF found at: ${sumatraPath}`);
       return resolve();
     }
-    
+
     log(`SumatraPDF.exe not found. Attempting auto-download from: ${SUMATRA_URL}`);
-    
+
     function download(url) {
       const client = url.startsWith('https') ? https : http;
       client.get(url, (response) => {
@@ -100,7 +100,7 @@ function ensureSumatraPDF() {
         });
         file.on('error', (err) => {
           file.close();
-          try { fs.unlinkSync(sumatraPath); } catch (e) {}
+          try { fs.unlinkSync(sumatraPath); } catch (e) { }
           reject(err);
         });
       }).on('error', (err) => {
@@ -138,11 +138,11 @@ const authMiddleware = (req, res, next) => {
   if (!config.authToken || config.authToken === 'paste_your_print_agent_token_here') {
     return next();
   }
-  
+
   const authHeader = req.headers.authorization;
   const tokenQuery = req.query.token;
   const incomingToken = authHeader ? authHeader.replace(/^Bearer\s+/i, '') : tokenQuery;
-  
+
   if (!incomingToken || incomingToken !== config.authToken) {
     log(`Unauthorized access attempt from IP: ${req.ip}`);
     return res.status(401).json({ error: 'Unauthorized: Invalid print agent token' });
@@ -162,9 +162,9 @@ app.get('/health', (req, res) => {
 
 app.get('/printers', authMiddleware, (req, res) => {
   log('Fetching Windows printer list...');
-  
-  // Try Get-CimInstance
-  exec('powershell -Command "Get-CimInstance Win32_Printer | Select-Object Name | ConvertTo-Json"', (err, stdout, stderr) => {
+
+  // Try Get-Printer (modern cmdlet, works best for user-profile Bluetooth printers)
+  exec('powershell -Command "Get-Printer | Select-Object Name | ConvertTo-Json"', (err, stdout, stderr) => {
     if (!err && stdout.trim()) {
       try {
         const parsed = JSON.parse(stdout);
@@ -175,18 +175,18 @@ app.get('/printers', authMiddleware, (req, res) => {
           printers = [parsed.Name];
         }
         if (printers.length > 0) {
-          log(`Successfully found ${printers.length} printer(s) via Get-CimInstance`);
+          log(`Successfully found ${printers.length} printer(s) via Get-Printer`);
           return res.json({ printers });
         }
-      } catch (parseErr) {}
+      } catch (parseErr) { }
     }
 
-    log('CimInstance failed or empty. Trying Get-WmiObject...');
-    // Fallback 1: Get-WmiObject
-    exec('powershell -Command "Get-WmiObject Win32_Printer | Select-Object Name | ConvertTo-Json"', (wmiErr, wmiStdout, wmiStderr) => {
-      if (!wmiErr && wmiStdout.trim()) {
+    log('Get-Printer failed or empty. Trying Get-CimInstance...');
+    // Fallback 1: Get-CimInstance
+    exec('powershell -Command "Get-CimInstance Win32_Printer | Select-Object Name | ConvertTo-Json"', (cimErr, cimStdout, cimStderr) => {
+      if (!cimErr && cimStdout.trim()) {
         try {
-          const parsed = JSON.parse(wmiStdout);
+          const parsed = JSON.parse(cimStdout);
           let printers = [];
           if (Array.isArray(parsed)) {
             printers = parsed.map(p => p.Name).filter(Boolean);
@@ -194,31 +194,52 @@ app.get('/printers', authMiddleware, (req, res) => {
             printers = [parsed.Name];
           }
           if (printers.length > 0) {
-            log(`Successfully found ${printers.length} printer(s) via Get-WmiObject`);
+            log(`Successfully found ${printers.length} printer(s) via Get-CimInstance`);
             return res.json({ printers });
           }
-        } catch (parseErr) {}
+        } catch (parseErr) { }
       }
 
-      log('Get-WmiObject failed or empty. Trying wmic...');
-      // Fallback 2: wmic
-      exec('wmic printer get name', (wmicErr, wmicStdout, wmicStderr) => {
-        if (!wmicErr && wmicStdout.trim()) {
-          const lines = wmicStdout.split('\r\n')
-            .map(l => l.trim())
-            .filter(l => l && l.toLowerCase() !== 'name');
-          if (lines.length > 0) {
-            log(`Successfully found ${lines.length} printer(s) via wmic`);
-            return res.json({ printers: lines });
-          }
+      log('CimInstance failed or empty. Trying Get-WmiObject...');
+      // Fallback 2: Get-WmiObject
+      exec('powershell -Command "Get-WmiObject Win32_Printer | Select-Object Name | ConvertTo-Json"', (wmiErr, wmiStdout, wmiStderr) => {
+        if (!wmiErr && wmiStdout.trim()) {
+          try {
+            const parsed = JSON.parse(wmiStdout);
+            let printers = [];
+            if (Array.isArray(parsed)) {
+              printers = parsed.map(p => p.Name).filter(Boolean);
+            } else if (parsed && parsed.Name) {
+              printers = [parsed.Name];
+            }
+            if (printers.length > 0) {
+              log(`Successfully found ${printers.length} printer(s) via Get-WmiObject`);
+              return res.json({ printers });
+            }
+          } catch (parseErr) { }
         }
 
-        log('All printer detection commands failed or returned 0 printers.');
-        return res.json({ printers: [] });
+        log('Get-WmiObject failed or empty. Trying wmic...');
+        // Fallback 3: wmic
+        exec('wmic printer get name', (wmicErr, wmicStdout, wmicStderr) => {
+          if (!wmicErr && wmicStdout.trim()) {
+            const lines = wmicStdout.split('\r\n')
+              .map(l => l.trim())
+              .filter(l => l && l.toLowerCase() !== 'name');
+            if (lines.length > 0) {
+              log(`Successfully found ${lines.length} printer(s) via wmic`);
+              return res.json({ printers: lines });
+            }
+          }
+
+          log('All printer detection commands failed or returned 0 printers.');
+          return res.json({ printers: [] });
+        });
       });
     });
   });
 });
+
 
 // Print Queue implementation
 const printQueue = [];
@@ -232,14 +253,14 @@ function enqueuePrintJob(job) {
 async function processQueue() {
   if (queueRunning) return;
   queueRunning = true;
-  
+
   while (printQueue.length > 0) {
     const job = printQueue[0];
     let success = false;
     let attempts = 0;
-    
+
     log(`Starting print job: ${job.id} for printer: ${job.printerName}`);
-    
+
     while (attempts < 3 && !success) {
       attempts++;
       try {
@@ -254,13 +275,13 @@ async function processQueue() {
         }
       }
     }
-    
+
     if (!success) {
       log(`Print job ${job.id} permanently failed after 3 attempts.`);
     }
     printQueue.shift(); // Remove from queue
   }
-  
+
   queueRunning = false;
 }
 
@@ -271,17 +292,17 @@ function executePrintJob(job) {
     if (!edgePath) {
       return reject(new Error('Microsoft Edge or Chrome browser not found on this system'));
     }
-    
+
     if (!fs.existsSync(sumatraPath)) {
       return reject(new Error('SumatraPDF.exe utility not found. Auto-download may have failed or was blocked.'));
     }
 
     const tempHtmlFile = path.join(os.tmpdir(), `kot_bill_${job.id}.html`);
     const tempPdfFile = path.join(os.tmpdir(), `kot_bill_${job.id}.pdf`);
-    
+
     log(`Writing temp HTML file: ${tempHtmlFile}`);
     fs.writeFileSync(tempHtmlFile, job.html, 'utf8');
-    
+
     // Step 1: Render HTML to PDF using MS Edge (headless)
     log(`Converting HTML to PDF via Edge...`);
     execFile(edgePath, [
@@ -295,12 +316,12 @@ function executePrintJob(job) {
         cleanupFiles(tempHtmlFile, tempPdfFile);
         return reject(new Error(`Failed to convert HTML to PDF: ${edgeErr.message}`));
       }
-      
+
       // Wait up to 1.5 seconds for the PDF file to be completely written to disk
       let checks = 0;
       const checkInterval = setInterval(() => {
         checks++;
-        
+
         let fileExists = false;
         try {
           if (fs.existsSync(tempPdfFile)) {
@@ -309,19 +330,19 @@ function executePrintJob(job) {
               fileExists = true;
             }
           }
-        } catch (e) {}
+        } catch (e) { }
 
         if (fileExists) {
           clearInterval(checkInterval);
           log(`PDF generated. Sending to printer: "${job.printerName}" via SumatraPDF...`);
-          
-                  // Step 2: Send PDF to printer using SumatraPDF
+
+          // Step 2: Send PDF to printer using SumatraPDF
           const sumatraArgs = [
             '-print-to', job.printerName,
             '-print-settings', 'portrait,noscale,noprompt',
             tempPdfFile
           ];
-          
+
           execFile(sumatraPath, sumatraArgs, (sumatraErr) => {
             cleanupFiles(tempHtmlFile, tempPdfFile);
             if (sumatraErr) {
@@ -351,23 +372,23 @@ function cleanupFiles(html, pdf) {
 
 app.post('/print', authMiddleware, (req, res) => {
   const { html, printerName } = req.body;
-  
+
   if (!html) {
     return res.status(400).json({ error: 'Missing HTML content' });
   }
   if (!printerName) {
     return res.status(400).json({ error: 'Missing printerName' });
   }
-  
+
   const jobId = Math.random().toString(36).substring(2, 10);
   log(`Enqueuing print job ${jobId} targeting: ${printerName}`);
-  
+
   enqueuePrintJob({
     id: jobId,
     html,
     printerName
   });
-  
+
   res.json({ success: true, jobId, message: 'Print job enqueued successfully' });
 });
 
@@ -376,7 +397,7 @@ app.post('/test-print', authMiddleware, (req, res) => {
   if (!printerName) {
     return res.status(400).json({ error: 'Missing printerName' });
   }
-  
+
   const testHtml = `
     <html>
       <head>
@@ -399,16 +420,16 @@ app.post('/test-print', authMiddleware, (req, res) => {
       </body>
     </html>
   `;
-  
+
   const jobId = 'test_' + Math.random().toString(36).substring(2, 6);
   log(`Enqueuing test print job ${jobId} for: ${printerName}`);
-  
+
   enqueuePrintJob({
     id: jobId,
     html: testHtml,
     printerName
   });
-  
+
   res.json({ success: true, jobId, message: 'Test print enqueued successfully' });
 });
 
@@ -427,7 +448,7 @@ ensureSumatraPDF()
   .catch((err) => {
     log(`FATAL: Failed to initialize Print Agent: ${err.message}`);
     log('Please place SumatraPDF.exe manually in this directory and restart the agent.');
-    
+
     // Still start Express on fallback so frontend can read health check state
     const port = config.port || 5001;
     app.listen(port, () => {
