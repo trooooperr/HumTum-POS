@@ -357,9 +357,7 @@ export function AppProvider({ children }) {
     const noteFontSize = isKitchen ? 9 : 10;
     
     const itemCount = items.length;
-    const pageHeight = isKitchen
-      ? Math.max(110, 80 + (itemCount * 14) + 10)
-      : Math.max(105, 70 + (itemCount * 9));
+    const pageHeight = isKitchen ? 210 : Math.max(105, 70 + (itemCount * 9));
 
     return `
     <html>
@@ -374,6 +372,7 @@ export function AppProvider({ children }) {
             padding: 0; 
             font-size: ${fontSize}px; 
             font-weight: bold;
+            ${isKitchen ? 'height: 160mm; position: relative;' : ''}
           }
           .header { text-align: center; font-weight: bold; margin-bottom: 6px; font-size: ${subFontSize}px; }
           .sub { text-align: center; font-size: ${subFontSize}px; margin-bottom: 4px; }
@@ -393,7 +392,7 @@ export function AppProvider({ children }) {
           ${(i.notes || i.note) ? `<div class="note">${i.notes || i.note}</div>` : ''}
         `).join('')}
         <div class="divider"></div>
-        ${isKitchen ? '<div style="margin-top: 40px; font-size: 1px; color: white; line-height: 1; margin: 0; padding: 0;">.</div>' : ''}
+        ${isKitchen ? '<div style="position: absolute; bottom: 5mm; left: 0; font-size: 1px; color: white; line-height: 1; margin: 0; padding: 0;">.</div>' : ''}
       </body>
     </html>
   `;
