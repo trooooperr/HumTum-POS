@@ -310,4 +310,66 @@ describe('Orders API', () => {
     expect(discountRes.body.dueAmount).toBe(0);
     expect(discountRes.body.cashAmount).toBe(95);
   });
+
+  it('should not alter date, businessDate, or billNo of an already finalized order when settling or updating payment mode', async () => {
+    // 1. Create an active order
+    const orderData = {
+      tableNo: 12,
+      items: [{ name: 'Test Tea', quantity: 1, price: 100 }],
+      subtotal: 100,
+      sgst: 2.5,
+      cgst: 2.5,
+      discount: 0,
+      grandTotal: 105,
+      paidAmount: 0,
+      dueAmount: 105,
+      paymentMode: 'cash',
+      isActive: true
+    };
+
+    const createRes = await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${token}`)
+      .send(orderData);
+    expect(createRes.statusCode).toBe(201);
+    const orderId = createRes.body._id;
+    expect(createRes.body.billNo).toBe('');
+
+    // 2. Finalize the order
+    const finalizeRes = await request(app)
+      .patch(`/api/orders/${orderId}/finalize-bill`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        items: orderData.items,
+        subtotal: 100,
+        sgst: 2.5,
+        cgst: 2.5,
+        discount: 0,
+        roundOff: 0,
+        grandTotal: 105,
+        paymentMode: 'cash',
+        cashAmount: 105
+      });
+    expect(finalizeRes.statusCode).toBe(200);
+    const originalBillNo = finalizeRes.body.billNo;
+    const originalDate = finalizeRes.body.date;
+    const originalBusinessDate = finalizeRes.body.businessDate;
+    expect(originalBillNo).toMatch(/^HTB-\d+$/);
+    expect(originalBusinessDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
+    // 3. Settle/edit payment mode
+    const settleRes = await request(app)
+      .patch(`/api/orders/${orderId}/settle`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        paymentMode: 'upi',
+        cashAmount: 0,
+        upiAmount: 105
+      });
+    expect(settleRes.statusCode).toBe(200);
+    expect(settleRes.body.paymentMode).toBe('upi');
+    expect(settleRes.body.billNo).toBe(originalBillNo);
+    expect(settleRes.body.businessDate).toBe(originalBusinessDate);
+    expect(settleRes.body.date).toBe(originalDate);
+  });
 });

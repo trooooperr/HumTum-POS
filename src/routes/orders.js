@@ -356,8 +356,6 @@ router.patch('/:id/finalize-bill', async (req, res) => {
     order.grandTotal = grandTotal;
     order.orderStatus = 'COMPLETED';
     order.isActive = false;
-    order.date = new Date();
-    order.businessDate = getBusinessDateString(order.date);
     if (waiterName !== undefined) order.waiterName = waiterName;
     if (orderType !== undefined) order.orderType = orderType;
     if (customerName !== undefined) order.customerName = customerName;
@@ -368,6 +366,8 @@ router.patch('/:id/finalize-bill', async (req, res) => {
 
     // Generate and assign sequential bill number at checkout
     if (!order.billNo || order.billNo === 'PENDING') {
+      order.date = new Date();
+      order.businessDate = getBusinessDateString(order.date);
       order.billNo = await generateNextBillNo(order.businessDate);
     }
 
@@ -449,9 +449,9 @@ router.patch('/:id/settle', async (req, res) => {
     if (order.dueAmount <= 0) {
       order.orderStatus = 'PAID';
       order.isActive = false;
-      order.date = new Date();
-      order.businessDate = getBusinessDateString(order.date);
       if (!order.billNo || order.billNo === 'PENDING') {
+        order.date = new Date();
+        order.businessDate = getBusinessDateString(order.date);
         order.billNo = await generateNextBillNo(order.businessDate);
       }
     }
@@ -551,9 +551,9 @@ router.patch('/:id/complete', async (req, res) => {
     // Mark order as completed
     order.orderStatus = 'COMPLETED';
     order.isActive = false;
-    order.date = new Date();
-    order.businessDate = getBusinessDateString(order.date);
     if (!order.billNo || order.billNo === 'PENDING') {
+      order.date = new Date();
+      order.businessDate = getBusinessDateString(order.date);
       order.billNo = await generateNextBillNo(order.businessDate);
     }
     const saved = await order.save();
