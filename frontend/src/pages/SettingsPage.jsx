@@ -187,10 +187,31 @@ export default function SettingsPage() {
     }
   };
 
+  const getBusinessDateString = (dateObj = new Date()) => {
+    const d = new Date(dateObj);
+    let year = d.getFullYear();
+    let month = d.getMonth();
+    let dateVal = d.getDate();
+    let hour = d.getHours();
+    if (hour < 5) {
+      const prevDay = new Date(year, month, dateVal - 1);
+      year = prevDay.getFullYear();
+      month = prevDay.getMonth();
+      dateVal = prevDay.getDate();
+    }
+    const yyyy = year;
+    const mm = String(month + 1).padStart(2, '0');
+    const dd = String(dateVal).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
   const summary = useMemo(() => {
     if (!orderHistory) return null;
-    const today = new Date().toLocaleDateString();
-    const todayOrders = orderHistory.filter(o => new Date(o.date).toLocaleDateString() === today);
+    const currentBizDate = getBusinessDateString(new Date());
+    const todayOrders = orderHistory.filter(o => {
+      const bizDate = o.businessDate || getBusinessDateString(o.date || o.createdAt);
+      return bizDate === currentBizDate;
+    });
     return {
       revenue: todayOrders.reduce((s, o) => s + o.grandTotal, 0),
       ordersCount: todayOrders.length,
@@ -461,20 +482,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <section className="settings-card">
-          <div className="settings-card-head">
-            <div>
-              <h2>Device Setting</h2>
-              <p>Configure options specific to this terminal browser.</p>
-            </div>
-          </div>
-          <div className="settings-fields">
-            <label className="settings-toggle">
-              <input type="checkbox" checked={isCashierPos} onChange={e => handleToggleCashier(e.target.checked)} />
-              <span>Enable Cashier POS features (Allow Bill Finalization)</span>
-            </label>
-          </div>
-        </section>
+
 
         <section className="settings-card settings-full">
           <div className="settings-card-head">
@@ -772,18 +780,7 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {summary && (
-            <div className="settings-kpi-grid">
-              <div className="settings-kpi">
-                <span>Revenue</span>
-                <strong>{c}{summary.revenue?.toFixed(0) || 0}</strong>
-              </div>
-              <div className="settings-kpi">
-                <span>Orders</span>
-                <strong>{summary.ordersCount || 0}</strong>
-              </div>
-            </div>
-          )}
+
 
           <div className="settings-fields settings-report-fields">
             <div className="settings-field">
