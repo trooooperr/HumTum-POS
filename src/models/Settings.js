@@ -27,6 +27,10 @@ const settingsSchema = new mongoose.Schema({
   inventoryCategories: { type: [String], default: ['Spirits','Beer','Wine','Food','Mixers'] },
   menuCategories:      { type: [String], default: ['Spirits','Beer','Wine','Food','Mixers'] },
   googleReviewLink:    { type: String, default: '' },
+  instagramLink:       { type: String, default: '' },
+  facebookLink:        { type: String, default: '' },
+  whatsappEnabled:     { type: Boolean, default: false },
+  whatsappTemplate:    { type: String, default: 'Thank you for dining with us, {customerName}! Your bill no. is {billNo} for {grandTotal}. Please share your review here: {googleReviewLink}. Follow us on Instagram: {instagramLink} and Facebook: {facebookLink}' },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Settings', settingsSchema);

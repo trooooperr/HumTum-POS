@@ -4,7 +4,7 @@ import { Save, Check, Send, KeyRound, ShieldAlert, Users, Trash2, RefreshCw, Gri
 import { apiUrl, authFetch } from '../lib/api';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 export default function SettingsPage() {
-  const { settings, setSettings, saveSettings, currentUser, orderHistory, workers, loadData, agentConnected, agentPrinters, fetchAgentPrinters } = useApp();
+  const { settings, setSettings, saveSettings, currentUser, orderHistory, workers, loadData, agentConnected, agentPrinters, fetchAgentPrinters, socket } = useApp();
   const [form, setForm] = useState({ ...settings, billingPrinterName: settings.billingPrinterName || '' });
   const [saved, setSaved] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -30,6 +30,74 @@ export default function SettingsPage() {
   const [editCatVal, setEditCatVal] = useState('');
   // Ref to detect double‑tap on touch devices
   const lastTapRef = useRef(0);
+
+  const [whatsappStatus, setWhatsappStatus] = useState({ status: 'DISCONNECTED', qr: null, user: null });
+  const [loadingWhatsapp, setLoadingWhatsapp] = useState(false);
+
+  const fetchWhatsappStatus = async () => {
+    try {
+      const res = await authFetch(apiUrl('/api/settings/whatsapp/status'));
+      if (res.ok) {
+        const data = await res.json();
+        setWhatsappStatus(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch WhatsApp status:', err);
+    }
+  };
+
+  const handleWhatsappConnect = async () => {
+    setLoadingWhatsapp(true);
+    try {
+      const res = await authFetch(apiUrl('/api/settings/whatsapp/connect'), { method: 'POST' });
+      if (res.ok) {
+        showToast('Connecting WhatsApp...', 'info');
+        await fetchWhatsappStatus();
+      } else {
+        showToast('Failed to initiate WhatsApp connection', 'error');
+      }
+    } catch (err) {
+      showToast('Error connecting WhatsApp', 'error');
+    } finally {
+      setLoadingWhatsapp(false);
+    }
+  };
+
+  const handleWhatsappDisconnect = async () => {
+    if (!window.confirm('Are you sure you want to disconnect WhatsApp and log out?')) return;
+    setLoadingWhatsapp(true);
+    try {
+      const res = await authFetch(apiUrl('/api/settings/whatsapp/disconnect'), { method: 'POST' });
+      if (res.ok) {
+        showToast('WhatsApp disconnected successfully', 'success');
+        setWhatsappStatus({ status: 'DISCONNECTED', qr: null, user: null });
+      } else {
+        showToast('Failed to disconnect WhatsApp', 'error');
+      }
+    } catch (err) {
+      showToast('Error disconnecting WhatsApp', 'error');
+    } finally {
+      setLoadingWhatsapp(false);
+    }
+  };
+
+  useEffect(() => {
+    if (currentUser?.role === 'admin') {
+      fetchWhatsappStatus();
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (socket && currentUser?.role === 'admin') {
+      const handleStatusUpdate = (data) => {
+        setWhatsappStatus(data);
+      };
+      socket.on('WHATSAPP_STATUS_UPDATE', handleStatusUpdate);
+      return () => {
+        socket.off('WHATSAPP_STATUS_UPDATE', handleStatusUpdate);
+      };
+    }
+  }, [socket, currentUser]);
 
   const handleRenameMenuCategory = async (oldCat, newCat) => {
     const trimmed = newCat.trim();
@@ -798,6 +866,194 @@ export default function SettingsPage() {
             </button>
           </div>
         </section>
+
+        {currentUser?.role === 'admin' && (
+          <section className="settings-card settings-full">
+            <div className="settings-card-head">
+              <div>
+                <h2>WhatsApp Business Integration</h2>
+                <p>Send automated thank-you messages and review/social media links on bill finalization.</p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', marginTop: '16px' }}>
+              
+              {/* Left Column: Settings Configuration */}
+              <div style={{ flex: '1 1 450px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                <label className="settings-toggle">
+                  <input
+                    type="checkbox"
+                    checked={!!form.whatsappEnabled}
+                    onChange={e => set('whatsappEnabled', e.target.checked)}
+                  />
+                  <span>Enable Automatic WhatsApp Notifications</span>
+                </label>
+
+                <div className="settings-field">
+                  <label>Google Review Link</label>
+                  <input
+                    value={form.googleReviewLink || ''}
+                    onChange={e => set('googleReviewLink', e.target.value)}
+                    placeholder="https://g.page/r/.../review"
+                  />
+                </div>
+
+                <div className="settings-field">
+                  <label>Instagram Page Link</label>
+                  <input
+                    value={form.instagramLink || ''}
+                    onChange={e => set('instagramLink', e.target.value)}
+                    placeholder="https://instagram.com/your_handle"
+                  />
+                </div>
+
+                <div className="settings-field">
+                  <label>Facebook Page Link</label>
+                  <input
+                    value={form.facebookLink || ''}
+                    onChange={e => set('facebookLink', e.target.value)}
+                    placeholder="https://facebook.com/your_page"
+                  />
+                </div>
+
+                <div className="settings-field">
+                  <label>Thank You Message Template</label>
+                  <textarea
+                    rows={5}
+                    value={form.whatsappTemplate || ''}
+                    onChange={e => set('whatsappTemplate', e.target.value)}
+                    style={{
+                      width: '100%',
+                      background: 'var(--b2)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '8px',
+                      color: 'var(--t0)',
+                      padding: '10px',
+                      fontFamily: 'monospace',
+                      fontSize: '13px',
+                      resize: 'vertical'
+                    }}
+                    placeholder="Write your template..."
+                  />
+                  <div style={{ fontSize: '11px', color: 'var(--t2)', marginTop: '4px', lineHeight: '1.4' }}>
+                    Available placeholders: <br/>
+                    <strong>{`{customerName}`}</strong> (e.g. John Doe) &bull;{' '}
+                    <strong>{`{billNo}`}</strong> (e.g. HTB-001) &bull;{' '}
+                    <strong>{`{grandTotal}`}</strong> (e.g. ₹550) &bull;{' '}
+                    <strong>{`{googleReviewLink}`}</strong> &bull;{' '}
+                    <strong>{`{instagramLink}`}</strong> &bull;{' '}
+                    <strong>{`{facebookLink}`}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Connection State / QR Code */}
+              <div style={{
+                flex: '1 1 300px',
+                background: 'var(--b2)',
+                borderRadius: '12px',
+                padding: '20px',
+                border: '1px solid var(--border)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: '300px',
+                textAlign: 'center'
+              }}>
+                <h3 style={{ marginBottom: '10px', color: 'var(--t0)' }}>WhatsApp Connection Status</h3>
+                
+                {/* Status Indicator */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                  <div style={{
+                    width: '12px',
+                    height: '12px',
+                    borderRadius: '50%',
+                    backgroundColor: whatsappStatus.status === 'CONNECTED' ? '#4ade80' : whatsappStatus.status === 'CONNECTING' ? '#facc15' : '#f87171'
+                  }} />
+                  <span style={{ fontWeight: '600', color: 'var(--t1)', textTransform: 'uppercase', fontSize: '14px' }}>
+                    {whatsappStatus.status}
+                  </span>
+                </div>
+
+                {whatsappStatus.status === 'CONNECTED' ? (
+                  <div>
+                    <p style={{ color: 'var(--t2)', fontSize: '13px', marginBottom: '15px' }}>
+                      Connected to WhatsApp Business account: <strong>{whatsappStatus.user}</strong>
+                    </p>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={handleWhatsappDisconnect}
+                      disabled={loadingWhatsapp}
+                      style={{ background: '#f87171', color: 'white' }}
+                    >
+                      {loadingWhatsapp ? 'Disconnecting...' : 'Disconnect WhatsApp'}
+                    </button>
+                  </div>
+                ) : whatsappStatus.status === 'CONNECTING' ? (
+                  <div>
+                    {whatsappStatus.qr ? (
+                      <div>
+                        <p style={{ color: 'var(--t1)', fontSize: '13px', marginBottom: '12px' }}>
+                          Scan this QR code with WhatsApp to connect your account:
+                        </p>
+                        <div style={{
+                          background: 'white',
+                          padding: '10px',
+                          borderRadius: '8px',
+                          display: 'inline-block',
+                          marginBottom: '15px'
+                        }}>
+                          <img src={whatsappStatus.qr} alt="WhatsApp QR Code" style={{ width: '200px', height: '200px' }} />
+                        </div>
+                        <p style={{ color: 'var(--t2)', fontSize: '11px' }}>
+                          Open WhatsApp on your phone &gt; Settings &gt; Linked Devices &gt; Link a Device.
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p style={{ color: 'var(--t2)', fontSize: '13px', marginBottom: '15px' }}>
+                          Generating QR code, please wait...
+                        </p>
+                        <div className="settings-spinner" style={{
+                          border: '4px solid var(--b3)',
+                          borderTop: '4px solid var(--a)',
+                          borderRadius: '50%',
+                          width: '30px',
+                          height: '30px',
+                          animation: 'spin 1s linear infinite',
+                          margin: '0 auto'
+                        }} />
+                      </div>
+                    )}
+                    <button
+                      className="btn btn-secondary"
+                      onClick={handleWhatsappDisconnect}
+                      disabled={loadingWhatsapp}
+                      style={{ marginTop: '15px' }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <p style={{ color: 'var(--t2)', fontSize: '13px', marginBottom: '20px' }}>
+                      WhatsApp is currently disconnected. Click below to display the login QR code.
+                    </p>
+                    <button
+                      className="btn btn-primary"
+                      onClick={handleWhatsappConnect}
+                      disabled={loadingWhatsapp}
+                    >
+                      {loadingWhatsapp ? 'Generating QR...' : 'Connect WhatsApp'}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+            </div>
+          </section>
+        )}
 
         <section className="settings-card settings-full settings-security-card">
           <div className="settings-card-head">

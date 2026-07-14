@@ -82,6 +82,11 @@ function normalizeSettings(data) {
     menuCategories: cleanCategoryList(data.menuCategories) || [],
     senderEmail: FIXED_SENDER_EMAIL,
     adminEmail: data.adminEmail || DEFAULTS.adminEmail,
+    googleReviewLink: data.googleReviewLink || '',
+    instagramLink: data.instagramLink || '',
+    facebookLink: data.facebookLink || '',
+    whatsappEnabled: !!data.whatsappEnabled,
+    whatsappTemplate: data.whatsappTemplate || 'Thank you for dining with us, {customerName}! Your bill no. is {billNo} for {grandTotal}. Please share your review here: {googleReviewLink}. Follow us on Instagram: {instagramLink} and Facebook: {facebookLink}',
   };
 }
 
@@ -202,6 +207,10 @@ router.put('/', requireRole(['admin', 'manager']), async (req, res) => {
   if (req.body.includeUpiAmount !== undefined) settings.includeUpiAmount = !!req.body.includeUpiAmount;
   if (req.body.adminEmail !== undefined) settings.adminEmail = cleanString(req.body.adminEmail).toLowerCase();
   if (req.body.googleReviewLink !== undefined) settings.googleReviewLink = cleanString(req.body.googleReviewLink);
+  if (req.body.instagramLink !== undefined) settings.instagramLink = cleanString(req.body.instagramLink);
+  if (req.body.facebookLink !== undefined) settings.facebookLink = cleanString(req.body.facebookLink);
+  if (req.body.whatsappEnabled !== undefined) settings.whatsappEnabled = !!req.body.whatsappEnabled;
+  if (req.body.whatsappTemplate !== undefined) settings.whatsappTemplate = cleanString(req.body.whatsappTemplate);
 
   const inventoryCategories = cleanCategoryList(req.body.inventoryCategories);
   if (inventoryCategories !== undefined) {
@@ -307,6 +316,36 @@ router.patch('/menu-category/rename', requireRole(['admin', 'manager']), async (
     res.json(settings.menuCategories);
   } catch (err) {
     console.error('Rename Menu Category Error:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ── WHATSAPP API ENDPOINTS (Admin only) ──────────────────────────
+router.get('/whatsapp/status', requireRole(['admin']), (req, res) => {
+  try {
+    const whatsappService = require('../lib/whatsappService');
+    res.json(whatsappService.getStatus());
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.post('/whatsapp/connect', requireRole(['admin']), async (req, res) => {
+  try {
+    const whatsappService = require('../lib/whatsappService');
+    await whatsappService.connect();
+    res.json({ message: 'WhatsApp connection initiated' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.post('/whatsapp/disconnect', requireRole(['admin']), async (req, res) => {
+  try {
+    const whatsappService = require('../lib/whatsappService');
+    await whatsappService.disconnect();
+    res.json({ message: 'WhatsApp disconnected' });
+  } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });

@@ -276,6 +276,22 @@ router.post('/', async (req, res) => {
     });
     const saved = await order.save();
 
+    // Trigger WhatsApp Thank You notification in the background
+    if (saved.customerPhone && !saved.isActive) {
+      (async () => {
+        try {
+          const Settings = require('../models/Settings');
+          const settingsObj = await Settings.findOne();
+          if (settingsObj && settingsObj.whatsappEnabled) {
+            const whatsappService = require('../lib/whatsappService');
+            await whatsappService.sendThankYouMessage(saved, settingsObj);
+          }
+        } catch (waErr) {
+          console.error('[WhatsApp] Auto trigger error:', waErr.message);
+        }
+      })();
+    }
+
     let directOrderInventory = null;
     if (isDirectOrder) {
       try {
@@ -375,6 +391,22 @@ router.patch('/:id/finalize-bill', async (req, res) => {
     }
 
     const saved = await order.save();
+
+    // Trigger WhatsApp Thank You notification in the background
+    if (saved.customerPhone && !saved.isActive) {
+      (async () => {
+        try {
+          const Settings = require('../models/Settings');
+          const settingsObj = await Settings.findOne();
+          if (settingsObj && settingsObj.whatsappEnabled) {
+            const whatsappService = require('../lib/whatsappService');
+            await whatsappService.sendThankYouMessage(saved, settingsObj);
+          }
+        } catch (waErr) {
+          console.error('[WhatsApp] Auto trigger error:', waErr.message);
+        }
+      })();
+    }
 
     let updatedInventory = null;
 
@@ -570,6 +602,22 @@ router.patch('/:id/complete', async (req, res) => {
       order.businessDate = getBusinessDateString(order.date || order.createdAt);
     }
     const saved = await order.save();
+
+    // Trigger WhatsApp Thank You notification in the background
+    if (saved.customerPhone && !saved.isActive) {
+      (async () => {
+        try {
+          const Settings = require('../models/Settings');
+          const settingsObj = await Settings.findOne();
+          if (settingsObj && settingsObj.whatsappEnabled) {
+            const whatsappService = require('../lib/whatsappService');
+            await whatsappService.sendThankYouMessage(saved, settingsObj);
+          }
+        } catch (waErr) {
+          console.error('[WhatsApp] Auto trigger error:', waErr.message);
+        }
+      })();
+    }
 
     // Mark table session as completed and delete it to free the table index
     await TableSession.findOneAndDelete({ activeOrderId: order._id });
