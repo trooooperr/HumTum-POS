@@ -86,7 +86,7 @@ export default function SettingsPage() {
       setEditingInvCat(null);
     }
   };
-  
+
   const handleDetectPrinters = async () => {
     setFetchingPrinters(true);
     try {
@@ -497,7 +497,7 @@ export default function SettingsPage() {
               </div>
             )}
           </div>
-          
+
           <div className="settings-printing-row" style={{ marginTop: '14px' }}>
             <label className="settings-toggle" style={{ margin: 0 }}>
               <input type="checkbox" checked={!!form.printAgentEnabled} onChange={e => {
@@ -512,10 +512,10 @@ export default function SettingsPage() {
               <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid var(--b1)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
                   <h3 style={{ fontSize: '14px', fontWeight: '600', margin: 0 }}>Print Agent Configuration</h3>
-                  <a 
-                    href="/print-agent.zip" 
-                    download="print-agent.zip" 
-                    className="btn btn-secondary" 
+                  <a
+                    href="/print-agent.zip"
+                    download="print-agent.zip"
+                    className="btn btn-secondary"
                     style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '6px 14px', borderRadius: '8px', textDecoration: 'none', color: 'var(--t0)' }}
                   >
                     <Send size={13} />
@@ -525,25 +525,25 @@ export default function SettingsPage() {
                 <div className="settings-printing-row" style={{ gap: '16px', marginBottom: '16px' }}>
                   <div className="settings-field" style={{ flex: 1, minWidth: '150px' }}>
                     <label>Agent Port</label>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       disabled
-                      value={form.printAgentPort || 5001} 
+                      value={form.printAgentPort || 5001}
                       style={{ background: 'var(--b3)', cursor: 'not-allowed' }}
                     />
                   </div>
                   <div className="settings-field" style={{ flex: 2, minWidth: '250px' }}>
                     <label>Authorization Token (Paste into config.json)</label>
                     <div style={{ display: 'flex', gap: '8px' }}>
-                      <input 
-                        type="text" 
-                        readOnly 
-                        value={form.printAgentToken || ''} 
-                        style={{ fontFamily: 'monospace', fontSize: '12px', background: 'var(--b3)' }} 
+                      <input
+                        type="text"
+                        readOnly
+                        value={form.printAgentToken || ''}
+                        style={{ fontFamily: 'monospace', fontSize: '12px', background: 'var(--b3)' }}
                       />
-                      <button 
-                        type="button" 
-                        className="btn btn-secondary" 
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
                         onClick={() => {
                           navigator.clipboard.writeText(form.printAgentToken || '');
                           showToast('Token copied to clipboard', 'success');
@@ -685,7 +685,7 @@ export default function SettingsPage() {
                     style={{ background: 'var(--b2)', border: '1px solid var(--a)', borderRadius: '4px', color: 'var(--t0)', padding: '2px 6px', fontSize: '13px', width: '120px' }}
                   />
                 ) : (
-                  <span 
+                  <span
                     className="cat-name"
                     onDoubleClick={() => { setEditingMenuCat(cat); setEditCatVal(cat); }}
                     onTouchStart={() => {
@@ -745,7 +745,7 @@ export default function SettingsPage() {
                     style={{ background: 'var(--b2)', border: '1px solid var(--a)', borderRadius: '4px', color: 'var(--t0)', padding: '2px 6px', fontSize: '13px', width: '120px' }}
                   />
                 ) : (
-                  <span 
+                  <span
                     className="cat-name"
                     onDoubleClick={() => { setEditingInvCat(cat); setEditCatVal(cat); }}
                     onTouchStart={() => {

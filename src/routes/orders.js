@@ -319,6 +319,7 @@ router.patch('/:id/finalize-bill', async (req, res) => {
 
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: 'Order not found' });
+    const wasActive = order.isActive;
 
     // Server-side safeguard for CLR item
     const hasClrItem = Array.isArray(items) && items.some(i => i.name && i.name.toUpperCase() === 'CLR');
@@ -365,10 +366,12 @@ router.patch('/:id/finalize-bill', async (req, res) => {
     if (upiAmount !== undefined) order.upiAmount = parseFloat(upiAmount) || 0;
 
     // Generate and assign sequential bill number at checkout
-    if (!order.billNo || order.billNo === 'PENDING') {
+    if (wasActive || !order.billNo || order.billNo === 'PENDING') {
       order.date = new Date();
       order.businessDate = getBusinessDateString(order.date);
       order.billNo = await generateNextBillNo(order.businessDate);
+    } else if (!order.businessDate) {
+      order.businessDate = getBusinessDateString(order.date || order.createdAt);
     }
 
     const saved = await order.save();
@@ -429,6 +432,7 @@ router.patch('/:id/settle', async (req, res) => {
     const { paidAmount, paymentMode, cashAmount, upiAmount } = req.body;
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: 'Order not found' });
+    const wasActive = order.isActive;
 
     if (order.grandTotal <= 0) {
       return res.status(400).json({ message: 'Cannot settle payment for order with grand total 0' });
@@ -449,10 +453,12 @@ router.patch('/:id/settle', async (req, res) => {
     if (order.dueAmount <= 0) {
       order.orderStatus = 'PAID';
       order.isActive = false;
-      if (!order.billNo || order.billNo === 'PENDING') {
+      if (wasActive || !order.billNo || order.billNo === 'PENDING') {
         order.date = new Date();
         order.businessDate = getBusinessDateString(order.date);
         order.billNo = await generateNextBillNo(order.businessDate);
+      } else if (!order.businessDate) {
+        order.businessDate = getBusinessDateString(order.date || order.createdAt);
       }
     }
 
@@ -520,6 +526,10 @@ router.patch('/:id/discount', async (req, res) => {
       order.dueAmount = Math.max(0, rounded - order.paidAmount);
     }
 
+    if (!order.businessDate) {
+      order.businessDate = getBusinessDateString(order.date || order.createdAt);
+    }
+
     const saved = await order.save();
     await deleteCache([ORDERS_CACHE_KEY, REPORT_SUMMARY_CACHE_KEY]);
     res.json(saved);
@@ -533,6 +543,7 @@ router.patch('/:id/complete', async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: 'Order not found' });
+    const wasActive = order.isActive;
 
     // Server-side safeguard for CLR item
     const hasClrItem = Array.isArray(order.items) && order.items.some(i => i.name && i.name.toUpperCase() === 'CLR');
@@ -551,10 +562,12 @@ router.patch('/:id/complete', async (req, res) => {
     // Mark order as completed
     order.orderStatus = 'COMPLETED';
     order.isActive = false;
-    if (!order.billNo || order.billNo === 'PENDING') {
+    if (wasActive || !order.billNo || order.billNo === 'PENDING') {
       order.date = new Date();
       order.businessDate = getBusinessDateString(order.date);
       order.billNo = await generateNextBillNo(order.businessDate);
+    } else if (!order.businessDate) {
+      order.businessDate = getBusinessDateString(order.date || order.createdAt);
     }
     const saved = await order.save();
 

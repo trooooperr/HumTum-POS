@@ -347,19 +347,17 @@ export function AppProvider({ children }) {
 
   const buildKOTHtml = useCallback((kot, tableNo, items, printerLabel) => {
     const isKitchen = printerLabel === 'KITCHEN';
-    const paperWidth = isKitchen ? 58 : 80;
-    const bodyWidth = isKitchen ? 48 : 70;
-    const fontSize = isKitchen ? 11 : 12;
-    const headerFontSize = isKitchen ? 13 : 14;
-    const subFontSize = isKitchen ? 10 : 11;
-    const qtyWidth = isKitchen ? 20 : 24;
-    const qtyAlign = isKitchen ? 'right' : 'left';
-    const noteFontSize = isKitchen ? 9 : 10;
+    const paperWidth = 80;
+    const bodyWidth = 70;
+    const fontSize = 12;
+    const headerFontSize = 14;
+    const subFontSize = 11;
+    const qtyWidth = 24;
+    const qtyAlign = 'left';
+    const noteFontSize = 10;
     
     const itemCount = items.length;
-    const pageHeight = isKitchen
-      ? Math.max(150, 110 + (itemCount * 14) + 35)
-      : Math.max(105, 70 + (itemCount * 9));
+    const pageHeight = Math.max(105, 70 + (itemCount * 9));
 
     return `
     <html>
