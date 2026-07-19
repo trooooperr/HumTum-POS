@@ -354,6 +354,14 @@ async function startServer() {
     await connectRedis();
     await warmupCache();
     await migrateInventoryMenuItems();
+    (async () => {
+      try {
+        const { backfillDailyStockReports } = require('./src/lib/inventoryReport');
+        await backfillDailyStockReports();
+      } catch (bfErr) {
+        console.error('⚠️  Daily report backfill failed:', bfErr.message);
+      }
+    })();
 
     setupSocketIO();
 

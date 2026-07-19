@@ -183,6 +183,20 @@ async function deductInventoryForItems(items = []) {
 
   if (ops.length) {
     await Inventory.bulkWrite(ops, { ordered: false });
+    try {
+      const { recordStockChange } = require('./inventoryReport');
+      for (const [invId, totalDeduction] of parentDeductionMap.entries()) {
+        await recordStockChange(invId, -totalDeduction, 'sale');
+      }
+      for (const [name, quantity] of quantities.entries()) {
+        const directInv = inventoryByName.get(normalizeName(name));
+        if (directInv && directInv.linkInventoryId) {
+          await recordStockChange(directInv._id, -quantity, 'sale');
+        }
+      }
+    } catch (err) {
+      console.error('Error logging daily stock deductions:', err.message);
+    }
   }
 
   const uniqueParentIds = [...new Set([
@@ -274,6 +288,20 @@ async function refundInventoryForItems(items = []) {
 
   if (ops.length) {
     await Inventory.bulkWrite(ops, { ordered: false });
+    try {
+      const { recordStockChange } = require('./inventoryReport');
+      for (const [invId, totalRefund] of parentRefundMap.entries()) {
+        await recordStockChange(invId, totalRefund, 'refund');
+      }
+      for (const [name, quantity] of quantities.entries()) {
+        const directInv = inventoryByName.get(normalizeName(name));
+        if (directInv && directInv.linkInventoryId) {
+          await recordStockChange(directInv._id, quantity, 'refund');
+        }
+      }
+    } catch (err) {
+      console.error('Error logging daily stock refunds:', err.message);
+    }
   }
 
   const uniqueParentIds = [...new Set([

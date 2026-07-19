@@ -309,21 +309,56 @@ export default function InventoryPage() {
   const categories = Array.isArray(settings.inventoryCategories) && settings.inventoryCategories.length > 0
     ? settings.inventoryCategories
     : ['General'];
+  const getTodayLocalDate = () => {
+    const d = new Date();
+    const offset = d.getTimezoneOffset();
+    const local = new Date(d.getTime() - (offset*60*1000));
+    return local.toISOString().split('T')[0];
+  };
+
   const [modal, setModal] = useState(null);
   const [expanded, setExpanded] = useState(null);
   const [search, setSearch] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [startDate, setStartDate] = useState(getTodayLocalDate);
+  const [endDate, setEndDate] = useState(getTodayLocalDate);
   const startInputRef = React.useRef(null);
   const endInputRef = React.useRef(null);
-  const [cat, setCat] = useState(() => categories[0] || 'General');
+  const [cat, setCat] = useState('All');
   const [confirmDelete, setConfirmDelete] = useState(null);
 
+  // Daily Stock Report States
+  const [activeTab, setActiveTab] = useState('stock'); // 'stock' | 'report'
+  const [reportData, setReportData] = useState([]);
+  const [reportSearch, setReportSearch] = useState('');
+  const [loadingReport, setLoadingReport] = useState(false);
+  const [reportCat, setReportCat] = useState('All');
+
   useEffect(() => {
-    if (categories.length > 0 && !categories.includes(cat)) {
-      setCat(categories[0]);
+    if (categories.length > 0 && cat !== 'All' && !categories.includes(cat)) {
+      setCat('All');
     }
   }, [categories, cat]);
+
+  useEffect(() => {
+    if (activeTab !== 'report') return;
+    let active = true;
+    (async () => {
+      setLoadingReport(true);
+      try {
+        const res = await authFetch(apiUrl(`/api/inventory/daily-report?startDate=${startDate}&endDate=${endDate}`));
+        if (!res.ok) throw new Error('Failed to fetch daily report');
+        const data = await res.json();
+        if (active) {
+          setReportData(data);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (active) setLoadingReport(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [activeTab, startDate, endDate]);
 
   const clearFilters = () => {
     setSearch('');
@@ -410,7 +445,7 @@ export default function InventoryPage() {
 
   const filtered = inventory.filter(i => {
     const nameMatch = i.name && i.name.toLowerCase().includes(search.toLowerCase());
-    const catMatch = i.category === cat;
+    const catMatch = cat === 'All' || i.category === cat;
     return nameMatch && catMatch;
   });
 
@@ -441,273 +476,494 @@ export default function InventoryPage() {
     }
   };
 
+  const filteredReport = reportData.filter(i => {
+    const nameMatch = i.itemName && i.itemName.toLowerCase().includes(reportSearch.toLowerCase());
+    const catMatch = reportCat === 'All' || i.category === reportCat;
+    return nameMatch && catMatch;
+  });
+
   return (
     <div className="fi inventory-page">
-
-
-
-      {/* FILTER BAR - unified with OrdersPage */}
-      <div className="orders-filters-row">
-        <div style={{ display: 'flex', flex: 1, gap: 8 }}>
-          <div className="search-wrapper-unified" style={{ flex: 1 }}>
-  <Search size={16} className="search-icon" />
-  <input
-    value={search}
-    onChange={e => setSearch(e.target.value)}
-    placeholder="Search items..."
-    className="search-input-unified"
-  />
-  {search && (
-    <button className="search-clear-btn" onClick={() => setSearch('')} title="Clear search">
-      <X size={14} />
-    </button>
-  )}
-</div>
-          <div className="select-wrapper-unified hide-on-desktop" style={{ width: '110px', flexShrink: 0 }}>
-            <select value={cat} onChange={e => setCat(e.target.value)} style={{ paddingLeft: '14px' }}>
-              {categories.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-        </div>
-
-        {isAdmin && (
-          <button
-            className="btn btn-primary search-add-btn mobile-fab-btn"
-            onClick={() => setModal('add')}
-          >
-            <Plus size={14} className="add-icon" />
-            <span>Add</span>
-          </button>
-        )}
+      {/* TABS */}
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: '16px', gap: '8px', paddingBottom: '8px' }}>
+        <button
+          className={`tab-btn ${activeTab === 'stock' ? 'active' : ''}`}
+          onClick={() => setActiveTab('stock')}
+          style={{
+            padding: '8px 16px',
+            background: activeTab === 'stock' ? 'var(--gradient-accent)' : 'var(--s2)',
+            border: activeTab === 'stock' ? 'none' : '1px solid var(--b1)',
+            borderRadius: '8px',
+            color: activeTab === 'stock' ? '#000000' : 'var(--t1)',
+            fontWeight: '800',
+            cursor: 'pointer',
+            fontSize: '13px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            boxShadow: activeTab === 'stock' ? 'var(--sh-glowing)' : 'none',
+            transition: 'all 0.25s var(--ease)'
+          }}
+        >
+          Current Stock
+        </button>
+        <button
+          className={`tab-btn ${activeTab === 'report' ? 'active' : ''}`}
+          onClick={() => setActiveTab('report')}
+          style={{
+            padding: '8px 16px',
+            background: activeTab === 'report' ? 'var(--gradient-accent)' : 'var(--s2)',
+            border: activeTab === 'report' ? 'none' : '1px solid var(--b1)',
+            borderRadius: '8px',
+            color: activeTab === 'report' ? '#000000' : 'var(--t1)',
+            fontWeight: '800',
+            cursor: 'pointer',
+            fontSize: '13px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            boxShadow: activeTab === 'report' ? 'var(--sh-glowing)' : 'none',
+            transition: 'all 0.25s var(--ease)'
+          }}
+        >
+          Daily Stock Report
+        </button>
       </div>
 
-      {/* CATEGORY */}
-      <div className="chipsWrap hide-on-mobile">
-        {categories.map(c => (
-          <button
-            key={c}
-            className={`chip ${cat === c ? 'on' : ''}`}
-            onClick={() => setCat(c)}
-          >
-            {c}
-          </button>
-        ))}
-      </div>
-
-      {/* MOBILE */}
-      <div className="mobileView">
-        <DragDropContext onDragEnd={onDragEnd}>
-          <Droppable droppableId="inventory-mobile-list">
-            {(provided) => (
-              <div ref={provided.innerRef} {...provided.droppableProps}>
-                {filtered.map((i, index) => {
-                  const effectiveStock = (() => {
-                    if (i.linkInventoryId) {
-                      const parentId = typeof i.linkInventoryId === 'object' ? i.linkInventoryId._id : i.linkInventoryId;
-                      const parent = inventory.find(p => p._id === parentId);
-                      return parent ? { ...i, stock: parent.stock } : i;
-                    }
-                    return i;
-                  })();
-                  const s = getStatus(effectiveStock);
-                  const open = expanded === i._id;
-
-                  return (
-                    <Draggable key={i._id} draggableId={i._id} index={index} isDragDisabled={!isAdmin || !!search}>
-                      {(provided) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          {...provided.dragHandleProps}
-                          className="invCard"
-                          style={{
-                            ...provided.draggableProps.style,
-                            cursor: (!isAdmin || !!search) ? 'default' : 'grab'
-                          }}
-                        >
-                          <div className="invTop">
-                            <div>
-                               <div className="invName">{i.name}</div>
-                               {i.linkInventoryId && (
-                                 <div style={{ fontSize: '9px', color: 'var(--accent)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                   <span>📦 Links to: {
-                                     typeof i.linkInventoryId === 'object' 
-                                       ? i.linkInventoryId.name 
-                                       : (inventory?.find(inv => inv._id === i.linkInventoryId)?.name || 'Loading...')
-                                   } ({
-                                     Number(i.stockDeductionQty) < 1 
-                                       ? Number(i.stockDeductionQty).toFixed(3).replace(/\.?0+$/, '') 
-                                       : i.stockDeductionQty
-                                   })</span>
-                                 </div>
-                               )}
-                               {i.shortcut && <div className="invShortcutRow">Shortcut: <span className="invShortcut">{i.shortcut}</span></div>}
-                              <div className="invMeta">{i.category} • ₹{i.price}</div>
-                              <div style={{ marginTop: 4 }}>
-                                <span className={`badge ${i.isAlcoholic || i.isAlcohol ? 'b-red' : 'b-green'}`} style={{ fontSize: 10 }}>
-                                  {i.isAlcoholic || i.isAlcohol ? 'Alcoholic' : 'Non-Alcoholic'}
-                                </span>
-                              </div>
-                            </div>
-
-                             <div className="invRight">
-                               <div className="invStock">{i.trackStock === false ? '—' : (() => {
-                                 if (i.linkInventoryId) {
-                                   const parentId = typeof i.linkInventoryId === 'object' ? i.linkInventoryId._id : i.linkInventoryId;
-                                   const parent = inventory.find(p => p._id === parentId);
-                                   const parentStock = parent ? parent.stock : i.stock;
-                                   return Number(parentStock).toFixed(2).replace(/\.0+$/, '');
-                                 }
-                                 return Number(i.stock).toFixed(2).replace(/\.0+$/, '');
-                               })()}</div>
-                              <span className={`badge ${s.cls}`}>{s.text}</span>
-                            </div>
-                          </div>
-
-                          {isAdmin ? (
-                            <div className="invActions">
-                              {i.trackStock !== false && (
-                                <>
-                                  <button className="btn btn-danger btn-icon-sm" onClick={() => adjust(i._id, -1)}>-</button>
-                                  <button className="btn btn-success btn-icon-sm" onClick={() => adjust(i._id, 1)}>+</button>
-                                </>
-                              )}
-                              {/* <div style={{ display: 'flex', gap: 4, margin: '0 8px' }}>
-                                <button className="iBtn-round" disabled={index === 0 || !!search} onClick={() => handleShiftItem(index, 'up')} title="Move up" style={{ fontSize: 10, cursor: index === 0 || !!search ? 'not-allowed' : 'pointer', opacity: (index === 0 || !!search) ? 0.3 : 1 }}>▲</button>
-                                <button className="iBtn-round" disabled={index === filtered.length - 1 || !!search} onClick={() => handleShiftItem(index, 'down')} title="Move down" style={{ fontSize: 10, cursor: index === filtered.length - 1 || !!search ? 'not-allowed' : 'pointer', opacity: (index === filtered.length - 1 || !!search) ? 0.3 : 1 }}>▼</button>
-                              </div> */}
-                              <button className="btn btn-blue btn-sm" onClick={() => setModal(i)}>Edit</button>
-                              <button className="btn btn-icon-sm btn-danger" onClick={() => setConfirmDelete(i._id)} title="Delete item"><Trash2 size={14} /></button>
-                            </div>
-                          ) : (
-                            <div className="invActions view-only-label" style={{ padding: '4px 0', fontSize: 11, color: 'var(--t3)', fontStyle: 'italic' }}>
-                              Read-only Access
-                            </div>
-                          )}
-
-                          <div className="expand hide-mobile" onClick={() => setExpanded(open ? null : i._id)}>
-                            {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                          </div>
-
-                          {open && (
-                            <div className="invDetails">
-                              <span>Min: {i.trackStock === false ? '—' : i.minStock}</span>
-                              <span>₹{i.price}</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </Draggable>
-                  );
-                })}
-                {provided.placeholder}
+      {activeTab === 'stock' ? (
+        <>
+          {/* FILTER BAR - unified with OrdersPage */}
+          <div className="orders-filters-row">
+            <div style={{ display: 'flex', flex: 1, gap: 8 }}>
+              <div className="search-wrapper-unified" style={{ flex: 1 }}>
+                <Search size={16} className="search-icon" />
+                <input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search items..."
+                  className="search-input-unified"
+                />
+                {search && (
+                  <button className="search-clear-btn" onClick={() => setSearch('')} title="Clear search">
+                    <X size={14} />
+                  </button>
+                )}
               </div>
+              <div className="select-wrapper-unified hide-on-desktop" style={{ width: '110px', flexShrink: 0 }}>
+                <select value={cat} onChange={e => setCat(e.target.value)} style={{ paddingLeft: '14px' }}>
+                  <option value="All">All</option>
+                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {isAdmin && (
+              <button
+                className="btn btn-primary search-add-btn mobile-fab-btn"
+                onClick={() => setModal('add')}
+              >
+                <Plus size={14} className="add-icon" />
+                <span>Add</span>
+              </button>
             )}
-          </Droppable>
-        </DragDropContext>
-      </div>
+          </div>
 
-      {/* DESKTOP */}
-      <div className="desktopView">
-        <div className="card-table-wrapper">
-          <table className="dtable">
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th>Shortcut</th>
-                <th>Category</th>
-                <th>Price</th>
-                <th>Stock</th>
-                <th>Classification</th>
-                <th>Status</th>
-                {isAdmin && <th>Actions</th>}
-              </tr>
-            </thead>
+          {/* CATEGORY */}
+          <div className="chipsWrap hide-on-mobile">
+            <button
+              className={`chip ${cat === 'All' ? 'on' : ''}`}
+              onClick={() => setCat('All')}
+            >
+              All
+            </button>
+            {categories.map(c => (
+              <button
+                key={c}
+                className={`chip ${cat === c ? 'on' : ''}`}
+                onClick={() => setCat(c)}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
 
+          {/* MOBILE */}
+          <div className="mobileView">
             <DragDropContext onDragEnd={onDragEnd}>
-              <Droppable droppableId="inventory-desktop-list">
+              <Droppable droppableId="inventory-mobile-list">
                 {(provided) => (
-                  <tbody ref={provided.innerRef} {...provided.droppableProps}>
+                  <div ref={provided.innerRef} {...provided.droppableProps}>
                     {filtered.map((i, index) => {
                       const effectiveStock = (() => {
                         if (i.linkInventoryId) {
                           const parentId = typeof i.linkInventoryId === 'object' ? i.linkInventoryId._id : i.linkInventoryId;
                           const parent = inventory.find(p => p._id === parentId);
-                          return parent ? parent.stock : i.stock;
+                          return parent ? { ...i, stock: parent.stock } : i;
                         }
-                        return i.stock;
+                        return i;
                       })();
-                      const s = getStatus({ ...i, stock: effectiveStock });
+                      const s = getStatus(effectiveStock);
+                      const open = expanded === i._id;
+
                       return (
                         <Draggable key={i._id} draggableId={i._id} index={index} isDragDisabled={!isAdmin || !!search}>
                           {(provided) => (
-                            <tr
+                            <div
                               ref={provided.innerRef}
                               {...provided.draggableProps}
                               {...provided.dragHandleProps}
+                              className="invCard"
                               style={{
                                 ...provided.draggableProps.style,
                                 cursor: (!isAdmin || !!search) ? 'default' : 'grab'
                               }}
                             >
-                              <td>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                  <span>{i.name}</span>
-                                  {i.linkInventoryId && (
-                                    <span style={{ fontSize: '10px', color: '#8b949e', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px', fontWeight: 'normal' }}>
-                                      <span>Deductions parent:</span>
-                                      <span style={{ color: 'var(--accent)', fontWeight: 'bold' }}>
-                                        {typeof i.linkInventoryId === 'object' 
-                                          ? i.linkInventoryId.name 
-                                          : (inventory?.find(inv => inv._id === i.linkInventoryId)?.name || 'Loading...')}
-                                      </span>
-                                      <span>({
-                                        Number(i.stockDeductionQty) < 1 
-                                          ? Number(i.stockDeductionQty).toFixed(3).replace(/\.?0+$/, '') 
-                                          : i.stockDeductionQty
-                                      })</span>
-                                    </span>
-                                  )}
-                                </div>
-                              </td>
-                              <td>{i.shortcut ? <span className="invShortcut">{i.shortcut}</span> : '—'}</td>
-                              <td>{i.category}</td>
-                              <td>₹{i.price}</td>
-                               <td>{i.trackStock === false ? '—' : Number(i.stock).toFixed(2).replace(/\\.0+$/, '')}</td>
-                              <td>
-                                <span className={`badge ${i.isAlcoholic || i.isAlcohol ? 'b-red' : 'b-green'}`}>
-                                  {i.isAlcoholic || i.isAlcohol ? 'Alcoholic' : 'Non-Alcoholic'}
-                                </span>
-                              </td>
-                              <td><span className={`badge ${s.cls}`}>{s.text}</span></td>
-                               {isAdmin && (
-                                 <td className="action-cell">
-                                   {i.trackStock !== false && (
-                                     <>
-                                       <button className="btn btn-danger btn-icon-sm" onClick={() => adjust(i._id, -1)}>-</button>
-                                       <button className="btn btn-success btn-icon-sm" onClick={() => adjust(i._id, 1)}>+</button>
-                                     </>
+                              <div className="invTop">
+                                <div>
+                                   <div className="invName">{i.name}</div>
+                                   {i.linkInventoryId && (
+                                     <div style={{ fontSize: '9px', color: 'var(--accent)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                       <span>📦 Links to: {
+                                         typeof i.linkInventoryId === 'object' 
+                                           ? i.linkInventoryId.name 
+                                           : (inventory?.find(inv => inv._id === i.linkInventoryId)?.name || 'Loading...')
+                                       } ({
+                                         Number(i.stockDeductionQty) < 1 
+                                           ? Number(i.stockDeductionQty).toFixed(3).replace(/\.?0+$/, '') 
+                                           : i.stockDeductionQty
+                                       })</span>
+                                     </div>
                                    )}
-                                   {/* <span style={{ margin: '0 2px', color: 'var(--b1)' }}>|</span>
-                                   <button className="btn btn-icon-sm" disabled={index === 0 || !!search} onClick={() => handleShiftItem(index, 'up')} title="Move up" style={{ opacity: (index === 0 || !!search) ? 0.3 : 1 }}>▲</button>
-                                   <button className="btn btn-icon-sm" disabled={index === filtered.length - 1 || !!search} onClick={() => handleShiftItem(index, 'down')} title="Move down" style={{ opacity: (index === filtered.length - 1 || !!search) ? 0.3 : 1 }}>▼</button> */}
-                                   <button className="btn btn-blue btn-sm" onClick={() => setModal(i)}>Edit</button>
-                                   <button className="btn btn-icon-sm btn-danger" onClick={() => setConfirmDelete(i._id)} title="Delete item"><Trash2 size={14} /></button>
-                                 </td>
-                               )}
-                            </tr>
+                                   {i.shortcut && <div className="invShortcutRow">Shortcut: <span className="invShortcut">{i.shortcut}</span></div>}
+                                  <div className="invMeta">{i.category} • ₹{i.price}</div>
+                                  <div style={{ marginTop: 4 }}>
+                                    <span className={`badge ${i.isAlcoholic || i.isAlcohol ? 'b-red' : 'b-green'}`} style={{ fontSize: 10 }}>
+                                      {i.isAlcoholic || i.isAlcohol ? 'Alcoholic' : 'Non-Alcoholic'}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                 <div className="invRight">
+                                   <div className="invStock">{i.trackStock === false ? '—' : (() => {
+                                     if (i.linkInventoryId) {
+                                       const parentId = typeof i.linkInventoryId === 'object' ? i.linkInventoryId._id : i.linkInventoryId;
+                                       const parent = inventory.find(p => p._id === parentId);
+                                       const parentStock = parent ? parent.stock : i.stock;
+                                       return Number(parentStock).toFixed(2).replace(/\.0+$/, '');
+                                     }
+                                     return Number(i.stock).toFixed(2).replace(/\.0+$/, '');
+                                   })()}</div>
+                                  <span className={`badge ${s.cls}`}>{s.text}</span>
+                                </div>
+                              </div>
+
+                              {isAdmin ? (
+                                <div className="invActions">
+                                  {i.trackStock !== false && (
+                                    <>
+                                      <button className="btn btn-danger btn-icon-sm" onClick={() => adjust(i._id, -1)}>-</button>
+                                      <button className="btn btn-success btn-icon-sm" onClick={() => adjust(i._id, 1)}>+</button>
+                                    </>
+                                  )}
+                                  <button className="btn btn-blue btn-sm" onClick={() => setModal(i)}>Edit</button>
+                                  <button className="btn btn-icon-sm btn-danger" onClick={() => setConfirmDelete(i._id)} title="Delete item"><Trash2 size={14} /></button>
+                                </div>
+                              ) : (
+                                <div className="invActions view-only-label" style={{ padding: '4px 0', fontSize: 11, color: 'var(--t3)', fontStyle: 'italic' }}>
+                                  Read-only Access
+                                </div>
+                              )}
+
+                              <div className="expand hide-mobile" onClick={() => setExpanded(open ? null : i._id)}>
+                                {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                              </div>
+
+                              {open && (
+                                <div className="invDetails">
+                                  <span>Min: {i.trackStock === false ? '—' : i.minStock}</span>
+                                  <span>₹{i.price}</span>
+                                </div>
+                              )}
+                            </div>
                           )}
                         </Draggable>
                       );
                     })}
                     {provided.placeholder}
-                  </tbody>
+                  </div>
                 )}
               </Droppable>
             </DragDropContext>
-          </table>
-        </div>
-      </div>
+          </div>
+
+          {/* DESKTOP */}
+          <div className="desktopView">
+            <div className="card-table-wrapper">
+              <table className="dtable">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Shortcut</th>
+                    <th>Category</th>
+                    <th>Price</th>
+                    <th>Stock</th>
+                    <th>Classification</th>
+                    <th>Status</th>
+                    {isAdmin && <th>Actions</th>}
+                  </tr>
+                </thead>
+
+                <DragDropContext onDragEnd={onDragEnd}>
+                  <Droppable droppableId="inventory-desktop-list">
+                    {(provided) => (
+                      <tbody ref={provided.innerRef} {...provided.droppableProps}>
+                        {filtered.map((i, index) => {
+                          const effectiveStock = (() => {
+                            if (i.linkInventoryId) {
+                              const parentId = typeof i.linkInventoryId === 'object' ? i.linkInventoryId._id : i.linkInventoryId;
+                              const parent = inventory.find(p => p._id === parentId);
+                              return parent ? parent.stock : i.stock;
+                            }
+                            return i.stock;
+                          })();
+                          const s = getStatus({ ...i, stock: effectiveStock });
+                          return (
+                            <Draggable key={i._id} draggableId={i._id} index={index} isDragDisabled={!isAdmin || !!search}>
+                              {(provided) => (
+                                <tr
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  style={{
+                                    ...provided.draggableProps.style,
+                                    cursor: (!isAdmin || !!search) ? 'default' : 'grab'
+                                  }}
+                                >
+                                  <td>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                      <span>{i.name}</span>
+                                      {i.linkInventoryId && (
+                                        <span style={{ fontSize: '10px', color: '#8b949e', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px', fontWeight: 'normal' }}>
+                                          <span>Deductions parent:</span>
+                                          <span style={{ color: 'var(--accent)', fontWeight: 'bold' }}>
+                                            {typeof i.linkInventoryId === 'object' 
+                                              ? i.linkInventoryId.name 
+                                              : (inventory?.find(inv => inv._id === i.linkInventoryId)?.name || 'Loading...')}
+                                          </span>
+                                          <span>({
+                                            Number(i.stockDeductionQty) < 1 
+                                              ? Number(i.stockDeductionQty).toFixed(3).replace(/\.?0+$/, '') 
+                                              : i.stockDeductionQty
+                                          })</span>
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td>{i.shortcut ? <span className="invShortcut">{i.shortcut}</span> : '—'}</td>
+                                  <td>{i.category}</td>
+                                  <td>₹{i.price}</td>
+                                   <td>{i.trackStock === false ? '—' : Number(i.stock).toFixed(2).replace(/\.0+$/, '')}</td>
+                                  <td>
+                                    <span className={`badge ${i.isAlcoholic || i.isAlcohol ? 'b-red' : 'b-green'}`}>
+                                      {i.isAlcoholic || i.isAlcohol ? 'Alcoholic' : 'Non-Alcoholic'}
+                                    </span>
+                                  </td>
+                                  <td><span className={`badge ${s.cls}`}>{s.text}</span></td>
+                                   {isAdmin && (
+                                     <td className="action-cell">
+                                       {i.trackStock !== false && (
+                                         <>
+                                           <button className="btn btn-danger btn-icon-sm" onClick={() => adjust(i._id, -1)}>-</button>
+                                           <button className="btn btn-success btn-icon-sm" onClick={() => adjust(i._id, 1)}>+</button>
+                                         </>
+                                       )}
+                                       <button className="btn btn-blue btn-sm" onClick={() => setModal(i)}>Edit</button>
+                                       <button className="btn btn-icon-sm btn-danger" onClick={() => setConfirmDelete(i._id)} title="Delete item"><Trash2 size={14} /></button>
+                                     </td>
+                                   )}
+                                </tr>
+                              )}
+                            </Draggable>
+                          );
+                        })}
+                        {provided.placeholder}
+                      </tbody>
+                    )}
+                  </Droppable>
+                </DragDropContext>
+              </table>
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          {/* DAILY STOCK REPORT VIEW */}
+          <div className="orders-filters-row" style={{ marginBottom: '16px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', width: '100%', alignItems: 'center' }}>
+              <div className="search-wrapper-unified" style={{ flex: '1 1 200px' }}>
+                <Search size={16} className="search-icon" />
+                <input
+                  value={reportSearch}
+                  onChange={e => setReportSearch(e.target.value)}
+                  placeholder="Search report items..."
+                  className="search-input-unified"
+                />
+                {reportSearch && (
+                  <button className="search-clear-btn" onClick={() => setReportSearch('')} title="Clear search">
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+              <div style={{ flexShrink: 0 }}>
+                <DateField
+                  label="From Date"
+                  value={startDate}
+                  onChange={e => setStartDate(e.target.value)}
+                  inputRef={startInputRef}
+                />
+              </div>
+              <div style={{ flexShrink: 0 }}>
+                <DateField
+                  label="To Date"
+                  value={endDate}
+                  onChange={e => setEndDate(e.target.value)}
+                  inputRef={endInputRef}
+                />
+              </div>
+              <div className="select-wrapper-unified" style={{ width: '150px', flexShrink: 0 }}>
+                <select value={reportCat} onChange={e => setReportCat(e.target.value)} style={{ paddingLeft: '14px' }}>
+                  <option value="All">All Categories</option>
+                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {loadingReport ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--t2)', fontSize: '15px' }}>
+              ⏳ Loading daily stock report...
+            </div>
+          ) : (
+            <>
+              {/* Report Desktop View */}
+              <div className="desktopView">
+                <div className="card-table-wrapper">
+                  <table className="dtable">
+                    <thead>
+                      <tr>
+                        <th>Item Name</th>
+                        <th>Category</th>
+                        <th>Opening Stock</th>
+                        <th>Added Today (+/-)</th>
+                        <th>Sold Today</th>
+                        <th>Closing Stock</th>
+                        <th>Unit</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredReport.length === 0 ? (
+                        <tr>
+                          <td colSpan="8" style={{ textAlign: 'center', color: 'var(--t2)', padding: '24px' }}>
+                            No records found
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredReport.map(i => {
+                          const s = getStatus({ trackStock: true, stock: i.closingStock, minStock: i.minStock || 5 });
+                          return (
+                            <tr key={i.inventoryId}>
+                              <td style={{ fontWeight: 'bold', color: 'var(--t0)' }}>
+                                {i.itemName}
+                              </td>
+                              <td>{i.category}</td>
+                              <td style={{ fontFamily: 'monospace' }}>{Number(i.openingStock).toFixed(2).replace(/\.00$/, '')}</td>
+                              <td style={{
+                                fontFamily: 'monospace',
+                                color: i.addedStock > 0 ? '#4ade80' : i.addedStock < 0 ? '#f87171' : 'var(--t2)',
+                                fontWeight: i.addedStock !== 0 ? 'bold' : 'normal'
+                              }}>
+                                {i.addedStock > 0 ? `+${Number(i.addedStock).toFixed(2).replace(/\.00$/, '')}` : i.addedStock < 0 ? Number(i.addedStock).toFixed(2).replace(/\.00$/, '') : '—'}
+                              </td>
+                              <td style={{ fontFamily: 'monospace', color: i.soldStock > 0 ? '#f87171' : 'var(--t2)', fontWeight: i.soldStock > 0 ? 'bold' : 'normal' }}>
+                                {i.soldStock > 0 ? Number(i.soldStock).toFixed(2).replace(/\.00$/, '') : '—'}
+                              </td>
+                              <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{Number(i.closingStock).toFixed(2).replace(/\.00$/, '')}</td>
+                              <td>{i.unit}</td>
+                              <td><span className={`badge ${s.cls}`}>{s.text}</span></td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Report Mobile View */}
+              <div className="mobileView">
+                {filteredReport.length === 0 ? (
+                  <div style={{ textAlign: 'center', color: 'var(--t2)', padding: '24px' }}>No records found</div>
+                ) : (
+                  filteredReport.map(i => {
+                    const s = getStatus({ trackStock: true, stock: i.closingStock, minStock: i.minStock || 5 });
+                    return (
+                      <div key={i.inventoryId} className="invCard" style={{ cursor: 'default' }}>
+                        <div className="invTop">
+                          <div>
+                            <div className="invName" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              {i.itemName}
+                            </div>
+                            <div className="invMeta">{i.category} • {i.unit}</div>
+                          </div>
+                          <div className="invRight">
+                            <span className={`badge ${s.cls}`}>{s.text}</span>
+                          </div>
+                        </div>
+                        
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr 1fr 1fr',
+                          gap: '8px',
+                          marginTop: '12px',
+                          paddingTop: '12px',
+                          borderTop: '1px solid var(--b1)',
+                          textAlign: 'center',
+                          fontSize: '11px',
+                          color: 'var(--t2)'
+                        }}>
+                          <div>
+                            <div style={{ color: 'var(--t3)', marginBottom: '2px' }}>Opening</div>
+                            <div style={{ fontFamily: 'monospace', color: 'var(--t1)' }}>{Number(i.openingStock).toFixed(1).replace(/\.0$/, '')}</div>
+                          </div>
+                          <div>
+                            <div style={{ color: 'var(--t3)', marginBottom: '2px' }}>Added</div>
+                            <div style={{
+                              fontFamily: 'monospace',
+                              color: i.addedStock > 0 ? '#4ade80' : i.addedStock < 0 ? '#f87171' : 'var(--t1)'
+                            }}>{i.addedStock > 0 ? '+' : ''}{i.addedStock !== 0 ? Number(i.addedStock).toFixed(1).replace(/\.0$/, '') : '0'}</div>
+                          </div>
+                          <div>
+                            <div style={{ color: 'var(--t3)', marginBottom: '2px' }}>Sold</div>
+                            <div style={{
+                              fontFamily: 'monospace',
+                              color: i.soldStock > 0 ? '#f87171' : 'var(--t1)'
+                            }}>{i.soldStock > 0 ? Number(i.soldStock).toFixed(1).replace(/\.0$/, '') : '0'}</div>
+                          </div>
+                          <div>
+                            <div style={{ color: 'var(--t3)', marginBottom: '2px' }}>Closing</div>
+                            <div style={{ fontFamily: 'monospace', color: 'var(--t0)', fontWeight: 'bold' }}>{Number(i.closingStock).toFixed(1).replace(/\.0$/, '')}</div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </>
+          )}
+        </>
+      )}
 
       {/* MODAL */}
       {modal && (

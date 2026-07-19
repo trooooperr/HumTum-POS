@@ -50,6 +50,22 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET DAILY INVENTORY REPORT
+router.get('/daily-report', async (req, res) => {
+  try {
+    const { date, startDate, endDate } = req.query;
+    const resolvedStart = startDate || date || require('../lib/businessDay').getBusinessDateString(new Date());
+    const resolvedEnd = endDate || date || resolvedStart;
+
+    const { getDailyInventoryReportRange } = require('../lib/inventoryReport');
+    const report = await getDailyInventoryReportRange(resolvedStart, resolvedEnd);
+    res.json(report);
+  } catch (err) {
+    console.error('DAILY REPORT GET ERROR:', err.message);
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // GET SINGLE INVENTORY ITEM (Allowed for all authenticated staff)
 router.get('/:id', async (req, res) => {
   try {
@@ -96,6 +112,14 @@ router.post(
         stockDeductionQty: stockDeductionQty || 1
       });
       const savedInv = await invItem.save();
+      if (savedInv.stock > 0) {
+        try {
+          const { recordStockChange } = require('../lib/inventoryReport');
+          await recordStockChange(savedInv._id, savedInv.stock, 'addition');
+        } catch (err) {
+          console.error('Error logging new item stock addition:', err.message);
+        }
+      }
       if (savedInv.linkInventoryId) {
         const { syncChildStocks } = require('../lib/inventoryStock');
         await syncChildStocks([savedInv.linkInventoryId]);
@@ -169,12 +193,22 @@ router.put(
         req.body.isAlcoholic = !!req.body.isAlcoholic;
         req.body.isAlcohol = !!req.body.isAlcoholic;
       }
+      const oldItem = await Inventory.findById(req.params.id);
       const updated = await Inventory.findByIdAndUpdate(
         req.params.id,
         req.body,
         { new: true, runValidators: true }
       );
       if (!updated) return res.status(404).json({ message: 'Item not found' });
+      if (oldItem && oldItem.stock !== updated.stock) {
+        try {
+          const stockDiff = updated.stock - oldItem.stock;
+          const { recordStockChange } = require('../lib/inventoryReport');
+          await recordStockChange(updated._id, stockDiff, 'adjustment');
+        } catch (err) {
+          console.error('Error logging stock update adjustment:', err.message);
+        }
+      }
       const { syncChildStocks } = require('../lib/inventoryStock');
       if (updated.linkInventoryId) {
         await syncChildStocks([updated.linkInventoryId]);
@@ -227,6 +261,12 @@ router.patch('/:id/stock', requireRole(['admin', 'manager']), async (req, res) =
         parent.stock = Math.max(0, parent.stock + change);
         await parent.save();
         await syncChildStocks([parent._id]);
+        try {
+          const { recordStockChange } = require('../lib/inventoryReport');
+          await recordStockChange(parent._id, change, 'addition');
+        } catch (err) {
+          console.error('Error logging parent stock adjustment:', err.message);
+        }
       }
       finalUpdatedItem = await Inventory.findById(item._id).populate('linkInventoryId');
     } else {
@@ -234,6 +274,12 @@ router.patch('/:id/stock', requireRole(['admin', 'manager']), async (req, res) =
       const saved = await item.save();
       await syncChildStocks([saved._id]);
       finalUpdatedItem = saved;
+      try {
+        const { recordStockChange } = require('../lib/inventoryReport');
+        await recordStockChange(saved._id, quantityChange, 'addition');
+      } catch (err) {
+        console.error('Error logging standalone stock adjustment:', err.message);
+      }
     }
 
     // Sync menu item availability

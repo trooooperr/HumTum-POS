@@ -68,7 +68,7 @@ async function createTransport(emailConfig) {
 }
 
 // ── Build the HTML email report ──────────────────────────────────
-function buildReportHTML({ date, orders, settings, inventory }) {
+function buildReportHTML({ date, orders, settings, inventory, dailyReport = [] }) {
   const total   = orders.reduce((s,o)=>s+o.grandTotal,0);
   const paid    = orders.reduce((s,o)=>s+(o.paidAmount||o.grandTotal),0);
   const due     = orders.reduce((s,o)=>s+(o.dueAmount||0),0);
@@ -134,6 +134,37 @@ function buildReportHTML({ date, orders, settings, inventory }) {
     </tbody></table>
   </div>
 
+  <div class="section">
+    <h3>🍷 Daily Stock Sales & Drinks Report</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th>Opening</th>
+          <th>Added</th>
+          <th>Sold</th>
+          <th>Closing</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${dailyReport.length === 0 || !dailyReport.some(i => i.isAlcoholic || i.soldStock > 0 || i.addedStock !== 0)
+          ? '<tr><td colspan="5" style="text-align:center;color:#64748B">No drink sales or stock activity today</td></tr>'
+          : dailyReport
+              .filter(i => i.isAlcoholic || i.soldStock > 0 || i.addedStock !== 0)
+              .map(i => `
+                <tr>
+                  <td>${i.itemName} ${i.isAlcoholic ? '🍷' : ''}</td>
+                  <td style="font-family:monospace">${Number(i.openingStock).toFixed(2).replace(/\.00$/, '')} ${i.unit}</td>
+                  <td style="font-family:monospace;color:${i.addedStock > 0 ? '#10B981' : i.addedStock < 0 ? '#EF4444' : '#64748B'}">${i.addedStock > 0 ? '+' : ''}${i.addedStock !== 0 ? Number(i.addedStock).toFixed(2).replace(/\.00$/, '') : '—'}</td>
+                  <td style="font-family:monospace;color:#EF4444">${i.soldStock > 0 ? Number(i.soldStock).toFixed(2).replace(/\.00$/, '') : '—'}</td>
+                  <td style="font-family:monospace;font-weight:bold">${Number(i.closingStock).toFixed(2).replace(/\.00$/, '')} ${i.unit}</td>
+                </tr>
+              `).join('')
+        }
+      </tbody>
+    </table>
+  </div>
+
 
 
   <div class="section">
@@ -187,7 +218,9 @@ async function sendDailyReportInternal(options = {}) {
     return a.name.localeCompare(b.name);
   });
 
-  const html = buildReportHTML({ date: new Date(businessDateStr), orders, settings: resolvedSettings, inventory });
+  const { getDailyInventoryReport } = require('../lib/inventoryReport');
+  const dailyReport = await getDailyInventoryReport(businessDateStr);
+  const html = buildReportHTML({ date: new Date(businessDateStr), orders, settings: resolvedSettings, inventory, dailyReport });
   const transporter = await createTransport(resolvedEmailConfig);
   await transporter.verify();
 
@@ -250,7 +283,9 @@ router.get('/daily-html', async (req, res) => {
       return a.name.localeCompare(b.name);
     });
 
-    const html = buildReportHTML({ date: new Date(businessDateStr), orders, settings: resolvedSettings, inventory });
+    const { getDailyInventoryReport } = require('../lib/inventoryReport');
+    const dailyReport = await getDailyInventoryReport(businessDateStr);
+    const html = buildReportHTML({ date: new Date(businessDateStr), orders, settings: resolvedSettings, inventory, dailyReport });
     res.send(html);
   } catch (err) {
     console.error('Error generating daily HTML:', err.message);
