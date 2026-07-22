@@ -659,38 +659,77 @@ export function AppProvider({ children }) {
   }, []);
 
   const isFetching = React.useRef(false);
-  const loadData = useCallback(async (isSilent = false) => {
+  const loadData = useCallback(async (isSilent = false, components = ['menu', 'orders', 'workers', 'inventory', 'settings', 'sessions']) => {
     if (isFetching.current) return;
     isFetching.current = true;
     if (!isSilent) setLoading(true);
     setError(null);
     try {
-      const results = await Promise.allSettled([
-        safeFetch(apiUrl('/api/menu')),
-        safeFetch(apiUrl('/api/orders')),
-        safeFetch(apiUrl('/api/workers')),
-        safeFetch(apiUrl('/api/inventory')),
-        safeFetch(apiUrl('/api/settings')),
-        safeFetch(apiUrl('/api/orders/sessions/active')),
-      ]);
+      const promises = [];
+      const indexMap = {};
 
-      if (results[0].status === 'fulfilled' && Array.isArray(results[0].value)) {
-        setMenuItems(results[0].value);
+      if (components.includes('menu')) {
+        indexMap.menu = promises.length;
+        promises.push(safeFetch(apiUrl('/api/menu')));
       }
-      if (results[1].status === 'fulfilled' && Array.isArray(results[1].value)) {
-        setOrderHistory([...results[1].value].sort((a,b)=>new Date(b.updatedAt || b.date)-new Date(a.updatedAt || a.date)));
+      if (components.includes('orders')) {
+        indexMap.orders = promises.length;
+        promises.push(safeFetch(apiUrl('/api/orders')));
       }
-      if (results[2].status === 'fulfilled' && Array.isArray(results[2].value)) {
-        setWorkers(results[2].value);
+      if (components.includes('workers')) {
+        indexMap.workers = promises.length;
+        promises.push(safeFetch(apiUrl('/api/workers')));
       }
-      if (results[3].status === 'fulfilled' && Array.isArray(results[3].value)) {
-        setInventory(results[3].value);
+      if (components.includes('inventory')) {
+        indexMap.inventory = promises.length;
+        promises.push(safeFetch(apiUrl('/api/inventory')));
       }
-      if (results[4].status === 'fulfilled' && results[4].value && !Array.isArray(results[4].value)) {
-        setSettings(results[4].value);
+      if (components.includes('settings')) {
+        indexMap.settings = promises.length;
+        promises.push(safeFetch(apiUrl('/api/settings')));
       }
-      if (results[5].status === 'fulfilled' && Array.isArray(results[5].value)) {
-        setActiveSessions(results[5].value);
+      if (components.includes('sessions')) {
+        indexMap.sessions = promises.length;
+        promises.push(safeFetch(apiUrl('/api/orders/sessions/active')));
+      }
+
+      const results = await Promise.allSettled(promises);
+
+      if (components.includes('menu') && indexMap.menu !== undefined) {
+        const res = results[indexMap.menu];
+        if (res && res.status === 'fulfilled' && Array.isArray(res.value)) {
+          setMenuItems(res.value);
+        }
+      }
+      if (components.includes('orders') && indexMap.orders !== undefined) {
+        const res = results[indexMap.orders];
+        if (res && res.status === 'fulfilled' && Array.isArray(res.value)) {
+          setOrderHistory([...res.value].sort((a,b)=>new Date(b.updatedAt || b.date)-new Date(a.updatedAt || a.date)));
+        }
+      }
+      if (components.includes('workers') && indexMap.workers !== undefined) {
+        const res = results[indexMap.workers];
+        if (res && res.status === 'fulfilled' && Array.isArray(res.value)) {
+          setWorkers(res.value);
+        }
+      }
+      if (components.includes('inventory') && indexMap.inventory !== undefined) {
+        const res = results[indexMap.inventory];
+        if (res && res.status === 'fulfilled' && Array.isArray(res.value)) {
+          setInventory(res.value);
+        }
+      }
+      if (components.includes('settings') && indexMap.settings !== undefined) {
+        const res = results[indexMap.settings];
+        if (res && res.status === 'fulfilled' && res.value && !Array.isArray(res.value)) {
+          setSettings(res.value);
+        }
+      }
+      if (components.includes('sessions') && indexMap.sessions !== undefined) {
+        const res = results[indexMap.sessions];
+        if (res && res.status === 'fulfilled' && Array.isArray(res.value)) {
+          setActiveSessions(res.value);
+        }
       }
 
     } catch (err) {
@@ -839,7 +878,7 @@ export function AppProvider({ children }) {
 
     newSocket.on('REFRESH_MENU', () => {
       console.log('🔄 REFRESH_MENU received in POS frontend, re-fetching data...');
-      loadData(true);
+      loadData(true, ['menu', 'inventory']);
     });
 
     setSocket(newSocket);

@@ -462,19 +462,19 @@ function setupDbChangeStreams(io) {
       }
     });
 
-    // Watch menuitems collection
-    const menuStream = db.collection('menuitems').watch([], { fullDocument: 'updateLookup' });
-    menuStream.on('change', (change) => {
-      console.log('🍔 Change Stream: menuitems collection changed, broadcasting REFRESH_MENU');
-      io.emit('REFRESH_MENU');
-    });
+    // Watch menuitems collection (Commented out: endpoints handle REFRESH_MENU manually)
+    // const menuStream = db.collection('menuitems').watch([], { fullDocument: 'updateLookup' });
+    // menuStream.on('change', (change) => {
+    //   console.log('🍔 Change Stream: menuitems collection changed, broadcasting REFRESH_MENU');
+    //   io.emit('REFRESH_MENU');
+    // });
 
-    // Watch inventories collection
-    const invStream = db.collection('inventories').watch([], { fullDocument: 'updateLookup' });
-    invStream.on('change', (change) => {
-      console.log('🍻 Change Stream: inventories collection changed, broadcasting REFRESH_MENU');
-      io.emit('REFRESH_MENU');
-    });
+    // Watch inventories collection (Commented out: endpoints and KOT sync handle updates manually via INVENTORY_UPDATED)
+    // const invStream = db.collection('inventories').watch([], { fullDocument: 'updateLookup' });
+    // invStream.on('change', (change) => {
+    //   console.log('🍻 Change Stream: inventories collection changed, broadcasting REFRESH_MENU');
+    //   io.emit('REFRESH_MENU');
+    // });
 
     console.log('✅ MongoDB Change Streams initialized for real-time synchronization');
   } catch (err) {
