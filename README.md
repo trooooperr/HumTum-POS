@@ -1,6 +1,6 @@
-# HumTum POS System (V2.0 — Production ERP)
+# Bar POS System (V2.0 — Production ERP)
 
-A **premium, enterprise POS & Inventory System** engineered specifically for **HumTum Bar & Restaurant**.  
+A **premium, enterprise POS & Inventory System** engineered specifically for **Bar & Restaurant POS Operations**.  
 Features **atomic bill numbering, real-time stock deduction, silent thermal desktop printing**, and **role-secured API protection**.
 
 ---
@@ -53,7 +53,7 @@ graph LR
     end
 
     subgraph Hardware [3. Silent Printing & Data]
-        PRINT["🖨️ HumTum Print Agent"]
+        PRINT["🖨️ Silent Desktop Print Agent"]
         PRINTERS["🖨️ Kitchen & Cashier Thermal Printers"]
         DB[("🗄️ MongoDB & Redis")]
     end
@@ -76,7 +76,7 @@ graph LR
 flowchart TD
     A["📱 Customer Phone / Waiter POS"] -->|1. Place Food / Bar Order| B["⚙️ Express Backend API"]
     B -->|2. Check & Deduct Bar Stock| C[("🗄️ Bar Inventory")]
-    B -->|3. Send KOT HTML Payload| D["🖨️ HumTum Silent Print Agent"]
+    B -->|3. Send KOT HTML Payload| D["🖨️ Silent Desktop Print Agent"]
     D -->|4. Silent Print KOT Ticket| E["🖨️ Kitchen Thermal Printer"]
     
     E -->|5. Kitchen Prepares & Serves Food| F["💻 Cashier POS Terminal"]
@@ -163,7 +163,7 @@ PASS  src/test/health.test.js              (1 test)
 - **Frontend:** React 18, Vite, Tailwind CSS, Socket.IO Client
 - **Backend:** Node.js, Express 4, Socket.IO, Mongoose
 - **Database & Cache:** MongoDB Atlas, Upstash Redis
-- **Silent Printing:** HumTum Silent Print Agent (Port 5001 + SumatraPDF)
+- **Silent Printing:** Silent Desktop Print Agent (Port 5001 + SumatraPDF)
 
 ```bash
 # Backend Server Setup
@@ -180,4 +180,4 @@ cd print-agent && npm install && npm start
 
 ## License
 
-Built for **HumTum Bar & Restaurant**. All rights reserved.
+Built for **Bar & Restaurant POS ERP**. All rights reserved.
