@@ -44,25 +44,25 @@ graph LR
     subgraph Devices [1. Client Devices]
         PHONE["📱 Customer Phone"]
         POS["💻 Cashier / Waiter POS"]
-        KDS["📺 Kitchen Display (KDS)"]
     end
 
     subgraph Server [2. ERP Backend]
         API["⚙️ Express API"]
-        KOT["🍳 KOT & Sockets"]
-        STOCK["📦 Inventory & Tax Engine"]
+        BILL["🧾 Billing & Tax Engine"]
+        STOCK["📦 Inventory Engine"]
     end
 
-    subgraph Storage [3. Hardware & Data]
-        PRINT["🖨️ Silent Print Agent"]
+    subgraph Hardware [3. Silent Printing & Data]
+        PRINT["🖨️ HumTum Print Agent"]
+        PRINTERS["🖨️ Kitchen & Cashier Thermal Printers"]
         DB[("🗄️ MongoDB & Redis")]
     end
 
     PHONE --> API
     POS --> API
-    KDS <-->|WebSockets| KOT
-    API --> KOT & STOCK
+    API --> BILL & STOCK
     POS --> PRINT
+    PRINT --> PRINTERS
     API --> DB
 ```
 
@@ -74,15 +74,16 @@ graph LR
 
 ```mermaid
 flowchart TD
-    A["📱 Customer Phone / Waiter POS"] -->|1. Place Order| B["⚙️ Express Backend API"]
-    B -->|2. Check & Deduct Stock| C[("🗄️ Bar Inventory")]
-    B -->|3. Live Order Broadcast| D["📺 Kitchen Display (KDS)"]
-    B -->|4. Silent Print KOT| E["🖨️ Kitchen Printer"]
+    A["📱 Customer Phone / Waiter POS"] -->|1. Place Food / Bar Order| B["⚙️ Express Backend API"]
+    B -->|2. Check & Deduct Bar Stock| C[("🗄️ Bar Inventory")]
+    B -->|3. Send KOT HTML Payload| D["🖨️ HumTum Silent Print Agent"]
+    D -->|4. Silent Print KOT Ticket| E["🖨️ Kitchen Thermal Printer"]
     
-    D -->|5. Mark Food Served| F["💻 Cashier POS Terminal"]
+    E -->|5. Kitchen Prepares & Serves Food| F["💻 Cashier POS Terminal"]
     F -->|6. Settle Bill & Tax| G["⚡ Redis Atomic Bill #"]
-    G -->|7. Silent Print Receipt| H["🖨️ Thermal Receipt Printer"]
-    G -->|8. Sync Final Data| I["📈 Sales & Stock Reports"]
+    G -->|7. Deduct Delta Stock| C
+    G -->|8. Silent Print Customer Receipt| H["🖨️ Cashier Thermal Printer"]
+    G -->|9. Sync Final Data| I["📈 Sales & Stock Reports"]
 ```
 
 ---
@@ -95,32 +96,33 @@ sequenceDiagram
     actor Customer as 📱 Customer / Waiter
     actor Cashier as 💻 Cashier Terminal
     participant Server as ⚙️ Express Backend
-    participant KDS as 📺 Kitchen (KDS)
-    participant Printer as 🖨️ Thermal Printer
+    participant PrintAgent as 🖨️ Silent Print Agent
+    participant Printer as 🖨️ Kitchen & Cashier Printers
     participant DB as 🗄️ Database & Redis
 
-    Customer->>Server: 1. Place Order (KOT)
-    Server->>DB: 2. Deduct Bar Inventory Stock
-    Server->>KDS: 3. Broadcast KOT via Socket.IO
-    Server->>Printer: 4. Silent Print KOT Ticket
+    Customer->>Server: 1. Place Order (POST /api/kots)
+    Server->>DB: 2. Check & Deduct Bar Inventory Stock
+    Server->>PrintAgent: 3. Send KOT HTML Payload (Port 5001)
+    PrintAgent->>Printer: 4. Silent Print KOT Ticket in Kitchen
     
-    KDS->>Server: 5. Update Status (Preparing → Served)
+    Note over Customer, Cashier: Kitchen Prepares Food & Serves Customer
     
-    Customer->>Cashier: 6. Request Bill Payment
-    Cashier->>Server: 7. Settle Order
-    Server->>DB: 8. Get Atomic Bill # & Deduct Delta Stock
-    Server->>Printer: 9. Silent Print Customer Receipt
-    Server->>DB: 10. Update Sales & Stock Reports
+    Customer->>Cashier: 5. Request Final Bill
+    Cashier->>Server: 6. Settle Order (POST /api/orders/settle)
+    Server->>DB: 7. Fetch Atomic Bill # (Redis) & Deduct Delta Stock
+    Server->>PrintAgent: 8. Send Thermal Receipt HTML Payload
+    PrintAgent->>Printer: 9. Silent Print Customer Receipt at Cashier
+    Server->>DB: 10. Update Sales & Stock Reports (MongoDB)
 ```
 
 ---
 
 ## 🚀 Key Features
 
-1. **Decoupled Menu & Inventory:** Kitchen items bypass stock tracking for zero billing latency; Bar items track exact bottle-to-peg inventory.
+1. **Decoupled Menu & Inventory:** Kitchen items bypass stock tracking for zero billing latency; Bar items track exact bottle-to-peg inventory in real time.
 2. **Delta Stock Protection:** Deducts inventory during KOT creation and only deducts newly added items upon final bill printing to prevent double-deduction.
 3. **Atomic Bill Numbering:** Resilient daily sequential bill counter powered by Redis `INCR`.
-4. **HumTum Silent Desktop Printing:** Native local agent running on port `5001` that spools PDFs silently to ESC/POS thermal printers.
+4. **Direct Kitchen Silent Printing:** Local agent running on port `5001` that spools PDFs silently to Kitchen & Cashier ESC/POS thermal printers.
 
 ---
 
