@@ -1,4 +1,4 @@
-# BAR & Restaurant POS System (V2.0 — Enterprise-Grade Hospitality ERP)
+# HumTum POS System (V3.0 — Enterprise-Grade Hospitality ERP)
 
 A **premium, production-ready Restaurant & Bar POS ERP System** engineered specifically for **HumTum Bar & Restaurant**. 
 Built with **enterprise-level architecture, atomic data integrity, role-secured API security, custom silent desktop printing, and an automated stock & financial engine**, this platform delivers high concurrency safety and real-time operational control.
@@ -144,7 +144,7 @@ sequenceDiagram
 ---
 
 ### 2. Bill Settlement & Delta Stock Deduction Dataflow
-This flow highlights how final bills are calculated, enforcing atomic bill numbers, preventing double stock deduction for previously sent KOTs, and processing partial dues or full settlement.
+This flow highlights how final bills are calculated, enforcing atomic bill numbers, preventing double stock deduction for previously sent KOTs, and settling full payments.
 
 ```mermaid
 sequenceDiagram
@@ -175,9 +175,6 @@ sequenceDiagram
     end
 
     Server->>Server: Calculate Subtotal, SGST, CGST, Grand Total
-    alt Partial Settlement / Dues
-        Server->>DB: Create Transaction record for Dues balance
-    end
 
     Server->>DB: Update Order (isActive: false, orderStatus: 'Completed', billNo)
     Server-->>Client: 200 OK (Settled Order & Thermal Receipt HTML)
@@ -215,7 +212,7 @@ flowchart TD
 ### 2. Unified Billing & Financial Engine
 - Dynamically merges Kitchen Menu and Bar Inventory items into unified multi-category bills.
 - Sequential atomic bill numbering (resetting per business day session).
-- Full support for discounts, SGST/CGST calculations, partial settlements, and dues clearing.
+- Full support for discounts, SGST/CGST calculations, and instant settlement.
 - Immutability enforcement on settled bills (retains original bill number, date, and business date).
 
 ### 3. Kitchen Order Ticket (KOT) System
@@ -299,9 +296,9 @@ PASS  src/test/health.test.js              (1 test)
 - ✅ **KOT Refunds:** Item removal from active KOTs automatically restores exact inventory stock levels and recalculates completed order totals.
 - ✅ **Bill Numbering Integrity:** Atomic sequential bill numbering handles high concurrency, business date resets, and retains original numbers during payment settlement.
 
-#### 3. Financial & Partial Settlement Audit (`tough_audit.test.js`) — 2 Tests
-- ✅ **Partial Settlement:** Accurate handling of partial cash/card/UPI payments with remaining balance recorded under dues.
-- ✅ **Dues Settlement:** Verifies remaining dues can be cleared in history without mutating historical billing parameters.
+#### 3. Financial Audit (`tough_audit.test.js`) — 2 Tests
+- ✅ **Payment Settlement & Billing Accuracy:** Verified exact subtotal, SGST, CGST, discount, and grand total calculations across settlement methods.
+- ✅ **History Settlement Verification:** Verifies payment completion history without mutating original billing parameters.
 
 #### 4. Daily Inventory & Reporting Audit (`inventoryReport.test.js`) — 4 Tests
 - ✅ **Stock Adjustment Audit Logs:** Logs manual stock adjustments via API and order finalization deductions.
